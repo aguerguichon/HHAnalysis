@@ -1,0 +1,45 @@
+#include <iostream>
+#include <istream>
+#include <fstream>
+#include <map>
+#include <vector>
+#include <list>
+#include <string>
+
+#include "TFile.h"
+#include "TTree.h"
+#include "TH1.h"
+#include "TH1D.h"
+#include "TROOT.h"
+
+#include "PlotFunctions/MapBranches.h"
+
+class HHAnalysis
+{
+ public:
+  HHAnalysis();
+  ~HHAnalysis();
+
+
+  float GetExpectedSignificance(TH1 *histBkg, TH1 *histSignal, int mode, int method, double maxUnc, double *error);
+
+  double getExpectedSignificance (TH1 *hBkg, TH1 *hSig, int mode,int method, double maxUnc,double *error);
+
+  /*
+    Creates an histogram for each category of btag, each sample and each variable of interest. Saves the TH1D* of output in a root file.
+   */
+  void CreateSaveDistri(std::vector<std::string> vectInFiles, int selectionType, std::vector<std::string> vectVariables, std::vector<int> vectCategories, std::string outputFileName);
+
+  double GetWeight(int weightType, ChrisLib::MapBranches mapBranches);
+
+  bool IsEventSelected(int selectionType, ChrisLib::MapBranches mapBranches);
+
+  TH1D* InitialiseHist(std::string histName, std::string variable); 
+
+  void DrawDistriForLambdas(TFile *inFile, std::vector<std::string> listVariables, std::vector<int> vectCategories, std::vector<std::string> vectSamples, std::string path, std::string extension="eps");
+
+  std::vector<double> ReturnExtremalBins(TH1* hist);
+  
+  void DrawCompLONLOForLambdas(TFile *LOFile, TTree *LOTree, TFile *NLOFile, TTree *NLOTree, std::list<std::string> vectVariables, std::string savePath);
+
+};
