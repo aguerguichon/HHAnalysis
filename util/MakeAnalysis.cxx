@@ -6,6 +6,7 @@
 #include <list>
 #include <string>
 #include <sstream>
+#include <boost/program_options.hpp>
 
 #include "TFile.h"
 #include "TTree.h"
@@ -17,25 +18,41 @@
 #include "HHAnalysis/HHAnalysis.h"
 
 using namespace std;
+namespace po = boost::program_options;
 
 int main(int argc, char *argv[])
 {
+  po::options_description desc("Configuration files.");
+  vector<string> configFiles;
 
-  HHAnalysis hh;
-  //  hh.CreateSaveDistri({"/sps/atlas/d/delgove/private/HH/tree_v19/LOSignal.root"}, 0, {"mbbgamgam", "pTb1", "pTb2", "pTbb", "pTgam1", "pTgam2", "pTgamgam", "dRbb", "dRgamgam", "dRgamb"}, {2, 1} ,"/sps/atlas/a/aguerguichon/HHAnalysis/DistriLO/UnskimmedHighLevel.root");
-  hh.CreateSaveDistri({"/sps/atlas/d/delgove/private/HH/tree_v19/LOSignal.root"}, 0, {"mbbgamgam", "pTb1"}, {2, 1} ,"/sps/atlas/a/aguerguichon/HHAnalysis/Test/TestSelection0.root");
-  hh.CreateSaveDistri({"/sps/atlas/d/delgove/private/HH/tree_v19/skim_file/LOSignal.root"}, 1, {"mbbgamgam", "pTb1"}, {2, 1} ,"/sps/atlas/a/aguerguichon/HHAnalysis/Test/TestSelection1.root");
-  hh.CreateSaveDistri({"/sps/atlas/d/delgove/private/HH/tree_v19/skim_file/LOSignal.root"}, 12, {"mbbgamgam", "pTb1"}, {2, 1} ,"/sps/atlas/a/aguerguichon/HHAnalysis/Test/TestSelection12.root");
-  hh.CreateSaveDistri({"/sps/atlas/d/delgove/private/HH/tree_v19/skim_file/LOSignal.root"}, 13, {"mbbgamgam", "pTb1"}, {2, 1} ,"/sps/atlas/a/aguerguichon/HHAnalysis/Test/TestSelection13.root");
-  hh.CreateSaveDistri({"/sps/atlas/d/delgove/private/HH/tree_v19/skim_file/LOSignal.root"}, 22, {"mbbgamgam", "pTb1", "mgamgam"}, {2, 1} ,"/sps/atlas/a/aguerguichon/HHAnalysis/Test/TestSelection22.root");
-  hh.CreateSaveDistri({"/sps/atlas/d/delgove/private/HH/tree_v19/skim_file/LOSignal.root"}, 23, {"mbbgamgam", "pTb1", "mgamgam"}, {2, 1} ,"/sps/atlas/a/aguerguichon/HHAnalysis/Test/TestSelection23.root");
-  hh.CreateSaveDistri({"/sps/atlas/d/delgove/private/HH/tree_v19/skim_file/LOSignal.root"}, 32, {"mbbgamgam", "pTb1"}, {2, 1} ,"/sps/atlas/a/aguerguichon/HHAnalysis/Test/TestSelection32.root");
-  hh.CreateSaveDistri({"/sps/atlas/d/delgove/private/HH/tree_v19/skim_file/LOSignal.root"}, 33, {"mbbgamgam", "pTb1"}, {2, 1} ,"/sps/atlas/a/aguerguichon/HHAnalysis/Test/TestSelection33.root");
+  //define all options in the program 
+  desc.add_options()
+    ( "help", "Display this help message")
+    ( "configFiles", po::value<vector <string> >(&configFiles), "" )
+    ;
 
-  TFile *inFile=TFile::Open("/sps/atlas/a/aguerguichon/HHAnalysis/DistriLO/UnskimmedHighLevel.root");
+  //Define options gathered by position 
+  po::positional_options_description p;
+  p.add("configFiles", -1);
 
-  //hh.DrawDistriForLambdas(inFile, {"mbbgamgam", "pTb1", "pTb2", "pTbb", "pTgam1", "pTgam2", "pTgamgam", "dRbb", "dRgamgam", "dRgamb" }, {2, 1}, {"ALL"}, "/sps/atlas/a/aguerguichon/HHAnalysis/DistriLO/UnskimmedHighLevel_", "pdf");
+  // create a map vm that contains options and all arguments of options
+  po::variables_map vm;
+  po::store(po::command_line_parser(argc, argv).options(desc).positional(p).style(po::command_line_style::unix_style ^ po::command_line_style::allow_short).run(), vm);
+  po::notify(vm);
 
-  inFile->Close();
+  if (vm.count("help")) {cout << desc; return 0;}
+  //=========================================================
+
+  for (unsigned int iFile=0; iFile <configFiles.size(); iFile++){
+    HHAnalysis hh ( configFiles[iFile] );
+
+    hh.CreateSaveDistri();
+
+    TFile *inFile=TFile::Open( hh.GetOutFileName().c_str() );
+    
+    hh.DrawDistriForLambdas(inFile, "pdf");
+    inFile->Close();
+  }
+
   cout<<"End of program.\n";
 }

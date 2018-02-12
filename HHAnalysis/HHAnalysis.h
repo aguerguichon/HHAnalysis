@@ -17,7 +17,7 @@
 class HHAnalysis
 {
  public:
-  HHAnalysis();
+  HHAnalysis(std::string configFileName);
   ~HHAnalysis();
 
 
@@ -27,7 +27,8 @@ class HHAnalysis
 
   /**\brief Creates an histogram for each category of btag, each sample and each variable of interest. Saves the TH1D* of output in a root file.
    */
-  void CreateSaveDistri(std::vector<std::string> vectInFiles, int selectionType, std::vector<std::string> vectVariables, std::vector<int> vectCategories, std::string outputFileName);
+  //  void CreateSaveDistri(std::vector<std::string> vectInFiles, int selectionType, std::vector<std::string> vectVariables, std::vector<int> vectCategories, std::string outputFileName);
+  void CreateSaveDistri();
 
   /**\brief Returns the weight according to the weightType:
     - 0: for no selection weightMC*weightvertex*weightpileup*Lumi/LumiMC (default)
@@ -43,6 +44,7 @@ class HHAnalysis
     - 1: isPassed (skimmed files)
     - X2: low mass
     - X3: high mass
+
     selectionType/10 gives the extra cut to be applied if needed:
     - 1X: no extra cut (so basic low/high mass selection)
     - 2X: + mgamgam cut (mh=125.09 +-4.7(4.3) GeV for low (high) mass)
@@ -55,10 +57,22 @@ class HHAnalysis
 
   TH1D* InitialiseHist(std::string histName, std::string variable); 
 
-  void DrawDistriForLambdas(TFile *inFile, std::vector<std::string> listVariables, std::vector<int> vectCategories, std::vector<std::string> vectSamples, std::string path, std::string extension="eps");
+  void DrawDistriForLambdas(TFile *inFile, std::string extension="eps");
 
   std::vector<double> ReturnExtremalBins(TH1* hist);
   
-  void DrawCompLONLOForLambdas(TFile *LOFile, TTree *LOTree, TFile *NLOFile, TTree *NLOTree, std::list<std::string> vectVariables, std::string savePath);
+  // void DrawCompLONLOForLambdas(TFile *LOFile, TTree *LOTree, TFile *NLOFile, TTree *NLOTree, std::list<std::string> vectVariables, std::string savePathPlot);
 
+  std::string GetOutFileName();
+
+ private:
+  std::vector <std::string> m_vectInFiles;
+  std::vector <std::string> m_vectVariables;
+  std::vector <std::string> m_vectSamples;
+  std::vector <int> m_vectCategories;
+
+  std::string m_savePathPlot;
+  std::string m_outFileName;
+
+  int m_selectionType;
 };

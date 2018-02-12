@@ -5,7 +5,7 @@
 #include <vector>
 #include <string>
 #include <sstream>
-#include "boost/multi_array.hpp"
+#include "boost/program_options.hpp"
 
 #include "TFile.h"                                                                          
 #include "TTree.h"
@@ -25,15 +25,37 @@
 using namespace ChrisLib;
 using namespace std;
 
-using boost::extents;
+namespace po = boost::program_options;
 
 
 //==========================================================================================
-HHAnalysis::HHAnalysis(){
+HHAnalysis::HHAnalysis(string configFileName){
+  po::options_description configOptions("Configuration options");
+  configOptions.add_options()
+    ("help", "Help")
+    ("inFile", po::value<vector<string>>(&m_vectInFiles), "Root files to be used for the study.")
+    ("variable", po::value<vector<string>>(&m_vectVariables), "Variables used to create the histograms and to be drawn.")
+    ("sample", po::value<vector<string>>(&m_vectSamples), "Samples used. Keyword 'ALL' to used them all. ")
+    ("category", po::value<vector<int>>(&m_vectCategories), "b-tag categories used.")
+    ("savePathPlot", po::value<string>(&m_savePathPlot), "Path were the plots will be saved. Can be the absolute path or the absolute path+beginning of the name (name is of the form tagcatX_varY).")
+    ("outFileName", po::value<string>(&m_outFileName), "Name of the root file where histograms will be stored.")
+    ("selectionType", po::value<int>(&m_selectionType), "Type of selection basic (selectionType%10) or extra (selectionType/10)")
+    ;
+  
+  po::variables_map vm;
+  ifstream ifs( configFileName, ifstream::in );
+  po::store(po::parse_config_file(ifs, configOptions), vm);
+  po::notify(vm);
+
+  cout<<"Configuration file "<<configFileName<<" loaded."<<endl;
 }
 
 
 HHAnalysis::~HHAnalysis(){
+  m_vectInFiles.clear();
+  m_vectVariables.clear();
+  m_vectSamples.clear();
+  m_vectCategories.clear();
 }
 
 
@@ -169,8 +191,8 @@ double HHAnalysis::getExpectedSignificance(TH1 *hBkg, TH1 *hSig, int mode, int m
 }
 
 //==================================================================================
-void HHAnalysis::CreateSaveDistri(vector<string> vectInFiles, int selectionType, vector<string> vectVariables, vector<int> vectCategories, string outputFileName){
-
+//void HHAnalysis::CreateSaveDistri(vector<string> vectInFiles, int selectionType, vector<string> vectVariables, vector<int> vectCategories, string outputFileName){
+void HHAnalysis::CreateSaveDistri(){
   cout<<"HHAnalysis::CreateSaveDistri\n";
 
   map< string, TH1D* > mapHist;
@@ -180,7 +202,7 @@ void HHAnalysis::CreateSaveDistri(vector<string> vectInFiles, int selectionType,
   double weight{0};
   TFile *inFile{0};
   TTree *inTree{0};
-  list<string> listVariables(vectVariables.begin(),vectVariables.end());
+  list<string> listVariables(m_vectVariables.begin(),m_vectVariables.end());
   
   listVariables.push_back("tagcat");
   listVariables.push_back("weightMC"); listVariables.push_back("weightvertex"); listVariables.push_back("weightpileup"); listVariables.push_back("weightinit"); listVariables.push_back("Lumi"); listVariables.push_back("LumiMC"); listVariables.push_back("weightlowmass"); listVariables.push_back("weighthighmass");
@@ -188,8 +210,8 @@ void HHAnalysis::CreateSaveDistri(vector<string> vectInFiles, int selectionType,
 
   TH1::AddDirectory(kFALSE); 
 
-  for (unsigned int iFile=0; iFile<vectInFiles.size(); iFile++){
-    inFile=TFile::Open( (vectInFiles[iFile]).c_str() );
+  for (unsigned int iFile=0; iFile<m_vectInFiles.size(); iFile++){
+    inFile=TFile::Open( (m_vectInFiles[iFile]).c_str() );
     if (!inFile) throw invalid_argument( "HHAnalysis::CreateSaveDistri: no file provided." );
     inTree=(TTree*)inFile->Get("ntuple");
     if (!inFile) throw invalid_argument( "HHAnalysis::CreateSaveDistri: no tree provided." );
@@ -201,18 +223,18 @@ void HHAnalysis::CreateSaveDistri(vector<string> vectInFiles, int selectionType,
   
     for (unsigned int iEntry=0; iEntry<inTree->GetEntries(); iEntry++){
       inTree->GetEntry(iEntry);
-      if ( !IsEventSelected(selectionType, mapBranches) ) continue;
-      weight=GetWeight(selectionType%10, mapBranches);
-      if ( vectInFiles[iFile].find("LO")!=string::npos ) weight*=0.34*2.28;
+      if ( !IsEventSelected(m_selectionType, mapBranches) ) continue;
+      weight=GetWeight(m_selectionType%10, mapBranches);
+      if ( m_vectInFiles[iFile].find("LO")!=string::npos ) weight*=0.34*2.28;
 	
       //Create entries of mapHist and fill hists
-      for (unsigned int iCat=0; iCat<vectCategories.size(); iCat++){
-	if ( mapBranches.GetInt("tagcat")!=vectCategories[iCat] ) continue;
-	for (unsigned int iVar=0; iVar<vectVariables.size(); iVar++ ){
-	  histName="tagcat"+to_string( mapBranches.GetInt("tagcat") )+"_var"+vectVariables[iVar]+"_sample"+*sampleName;
+      for (unsigned int iCat=0; iCat<m_vectCategories.size(); iCat++){
+	if ( mapBranches.GetInt("tagcat")!=m_vectCategories[iCat] ) continue;
+	for (unsigned int iVar=0; iVar<m_vectVariables.size(); iVar++ ){
+	  histName="tagcat"+to_string( mapBranches.GetInt("tagcat") )+"_var"+m_vectVariables[iVar]+"_sample"+*sampleName;
 
-	  if ( !mapHist.count(histName) ) mapHist[histName]= InitialiseHist(histName, vectVariables[iVar]); 
-	  mapHist[histName]->Fill( mapBranches.GetDouble( vectVariables[iVar].c_str() ), weight );
+	  if ( !mapHist.count(histName) ) mapHist[histName]= InitialiseHist(histName, m_vectVariables[iVar]); 
+	  mapHist[histName]->Fill( mapBranches.GetDouble( m_vectVariables[iVar].c_str() ), weight );
 	} // end iVar
       }//end iCat  
     } //end iEntry
@@ -220,7 +242,7 @@ void HHAnalysis::CreateSaveDistri(vector<string> vectInFiles, int selectionType,
   }//end iFile
 
   //Saving histograms in a root file to be post treated.
-  TFile *outputFile=new TFile (outputFileName.c_str(), "RECREATE");
+  TFile *outputFile=new TFile (m_outFileName.c_str(), "RECREATE");
   for(auto &it : mapHist) it.second->Write();
   outputFile->Close();
   
@@ -266,7 +288,7 @@ double HHAnalysis::GetWeight(int weightType, MapBranches mapBranches){
   case 2:{weight=mapBranches.GetDouble("weightlowmass"); break;}
   case 3:{weight=mapBranches.GetDouble("weighthighmass"); break;}
 
-  default: weight=weight=mapBranches.GetDouble("weightMC")*mapBranches.GetDouble("weightvertex")*mapBranches.GetDouble("weightpileup")*(mapBranches.GetDouble("Lumi")/mapBranches.GetDouble("LumiMC") ); //no selection at all
+  default: weight=mapBranches.GetDouble("weightMC")*mapBranches.GetDouble("weightvertex")*mapBranches.GetDouble("weightpileup")*(mapBranches.GetDouble("Lumi")/mapBranches.GetDouble("LumiMC") ); //no selection at all
   }
   
   return weight;
@@ -301,8 +323,9 @@ TH1D* HHAnalysis::InitialiseHist(string histName, string strVariable){
 }
 
 //==================================================================================
-void HHAnalysis::DrawDistriForLambdas(TFile *inFile, vector<string> vectVariables, vector<int> vectCategories, vector<string> vectSamples, string path, string extension){
+//void HHAnalysis::DrawDistriForLambdas(TFile *inFile, vector<string> vectVariables, vector<int> vectCategories, vector<string> vectSamples, string path, string extension){
 
+void HHAnalysis::DrawDistriForLambdas(TFile *inFile, string extension){
   cout<<"HHAnalysis::DrawDistriForLambdas done.\n";
   TKey *key{0};
   TH1D *hist{0};
@@ -321,16 +344,16 @@ void HHAnalysis::DrawDistriForLambdas(TFile *inFile, vector<string> vectVariable
     if (cl->InheritsFrom("TH1D")){ //loop over all histograms
       hist = (TH1D*)key->ReadObj();
       histName=hist->GetName();
-      for (unsigned int iCat=0; iCat<vectCategories.size(); iCat++){
-	for (unsigned int iVar=0; iVar<vectVariables.size(); iVar++){
-	  plotName="tagcat"+to_string(vectCategories[iCat])+"_var"+vectVariables[iVar];
+      for (unsigned int iCat=0; iCat<m_vectCategories.size(); iCat++){
+	for (unsigned int iVar=0; iVar<m_vectVariables.size(); iVar++){
+	  plotName="tagcat"+to_string(m_vectCategories[iCat])+"_var"+m_vectVariables[iVar];
 	  if ( !mapHist.count(plotName) ) mapHist[plotName];
-	  for (unsigned int iSample=0; iSample<vectSamples.size(); iSample++){
+	  for (unsigned int iSample=0; iSample<m_vectSamples.size(); iSample++){
 	    if ( histName.find(plotName.c_str())==string::npos ) continue;
-	    if ( histName.find(vectSamples[iSample].c_str())==string::npos && vectSamples[iSample]!="ALL") continue;
+	    if ( histName.find(m_vectSamples[iSample].c_str())==string::npos && m_vectSamples[iSample]!="ALL") continue;
 	    mapHist[plotName].push_back(hist);	    
 	  }//end iSample
-	} //end it vectVariables
+	} //end it m_vectVariables
       }//end iCat
     } //if Inherits
   } //end while
@@ -356,7 +379,7 @@ void HHAnalysis::DrawDistriForLambdas(TFile *inFile, vector<string> vectVariable
     vectHistTmp=it.second;
     drawOpt.AddOption(vectOpt);
     drawOpt.AddOption("rangeUserX", (to_string(vectExtremalBins[0])+" "+to_string(vectExtremalBins[1])).c_str() );
-    drawOpt.AddOption("outName", (path+it.first).c_str() );
+    drawOpt.AddOption("outName", (m_savePathPlot+it.first).c_str() );
     drawOpt.AddOption("legendPos", "0.75 0.9");
     drawOpt.AddOption("latex", ("Category "+ catName +" b-tag").c_str() );
     drawOpt.AddOption("latexOpt", "0.45 0.8");
@@ -395,8 +418,11 @@ vector<double> HHAnalysis::ReturnExtremalBins(TH1* hist){
   return vectExtremalBins;
 }
 
-
+//==================================================================================
+string HHAnalysis::GetOutFileName(){
+  return m_outFileName;
+}
 
 //==================================================================================
-void HHAnalysis::DrawCompLONLOForLambdas(TFile *LOFile, TTree *LOTree, TFile *NLOFile, TTree *NLOTree, list<string> vectVariables, string savePath){
-}
+/*void HHAnalysis::DrawCompLONLOForLambdas(TFile *LOFile, TTree *LOTree, TFile *NLOFile, TTree *NLOTree, list<string> vectVariables, string savePath){
+}*/
