@@ -235,7 +235,8 @@ void HHAnalysis::CreateSaveDistri(){
 	for (unsigned int iVar=0; iVar<m_vectVariables.size(); iVar++ ){
 	  histName="tagcat"+to_string( mapBranches.GetInt("tagcat") )+"_var"+m_vectVariables[iVar]+"_sample"+*sampleName;
 
-	  if ( !mapHist.count(histName) ) mapHist[histName]= InitialiseHist(histName, m_vectVariables[iVar]); 
+	  //	  if ( !mapHist.count(histName) ) mapHist[histName]= InitialiseHist(histName, m_vectVariables[iVar]); 
+	  if ( !mapHist.count(histName) ) { mapHist[histName]=0; InitialiseHist(mapHist[histName], histName, m_vectVariables[iVar] );} 
 	  if ( mapBranches.IsInt(m_vectVariables[iVar].c_str()) ) mapHist[histName]->Fill( mapBranches.GetInt( m_vectVariables[iVar].c_str() ), weight );
 	  else if ( m_vectVariables[iVar].find("phi")!=string::npos ) mapHist[histName]->Fill( mapBranches.GetDouble( m_vectVariables[iVar].c_str() )*180/acos(-1), weight );
 	  else mapHist[histName]->Fill( mapBranches.GetDouble( m_vectVariables[iVar].c_str() ), weight );
@@ -333,9 +334,8 @@ bool HHAnalysis::IsHighMass(MapBranches mapBranches){
 
 
 //==================================================================================
-TH1D* HHAnalysis::InitialiseHist(string histName, string strVariable){
+void HHAnalysis::InitialiseHist(TH1D* &hist, string histName, string strVariable){
   TString var=strVariable;
-  TH1D* hist{0};
   if (var.Contains("mv2c")) hist= new TH1D (histName.c_str(), "", 200, -1, 1);
   else if (var.BeginsWith("m")) hist= new TH1D (histName.c_str(), "", 100, 0, 1000);
   else if (var.Contains("pT")) hist= new TH1D (histName.c_str(), "", 60, 0, 600);
@@ -344,8 +344,9 @@ TH1D* HHAnalysis::InitialiseHist(string histName, string strVariable){
   else if (var.Contains("phi")) hist= new TH1D (histName.c_str(), "", 18, -180, 180);
   else if (var.BeginsWith("n") && var.Contains("jet")) hist= new TH1D (histName.c_str(), "", 10, 0, 10);
   else hist= new TH1D (histName.c_str(), "", 2000, -1000, 1000);
-  return hist;
+  return;
 }
+
 
 //==================================================================================
 void HHAnalysis::DrawDistriForLambdas(TFile *inFile, string extension){
@@ -363,8 +364,6 @@ void HHAnalysis::DrawDistriForLambdas(TFile *inFile, string extension){
   while ( (key = (TKey *) next()) ) { //iteration on the keys of the root file
     cl = gROOT->GetClass(key->GetClassName()); //getting the class of each key
     if (cl->InheritsFrom("TH1D")){ //loop over all histograms
-      //      hist = (TH1D*)key->ReadObj();
-      //      histName=hist->GetName();
       histName = ((TH1D*)key->ReadObj())->GetName();
       for (unsigned int iCat=0; iCat<m_vectCategories.size(); iCat++){
 	for (unsigned int iVar=0; iVar<m_vectVariables.size(); iVar++){

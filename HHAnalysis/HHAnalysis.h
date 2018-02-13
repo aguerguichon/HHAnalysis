@@ -56,7 +56,7 @@ class HHAnalysis
   bool IsLowMass(ChrisLib::MapBranches mapBranches);
   bool IsHighMass(ChrisLib::MapBranches mapBranches);
 
-  TH1D* InitialiseHist(std::string histName, std::string variable); 
+  void InitialiseHist(TH1D* &hist, std::string histName, std::string variable); 
 
   void DrawDistriForLambdas(TFile *inFile, std::string extension="eps");
 
