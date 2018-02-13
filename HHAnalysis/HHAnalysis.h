@@ -40,15 +40,16 @@ class HHAnalysis
 
   /**\brief Returns true if the event is selected and false if not\n
      selectionType%10 gives the basic selection (linked to the weight):
-    - 0: no selection
-    - 1: isPassed (skimmed files)
+    - X0: no selection
+    - X1: isPassed (skimmed files)
     - X2: low mass
     - X3: high mass
 
     selectionType/10 gives the extra cut to be applied if needed:
-    - 1X: no extra cut (so basic low/high mass selection)
-    - 2X: + mgamgam cut (mh=125.09 +-4.7(4.3) GeV for low (high) mass)
-    - 3X: + mhh cut (mhh < (>) 350 GeV for low (high) mass)
+    - X: no extra cut (so basic low/high mass selection)
+    - 1X: + mgamgam cut (mh=125.09 +-4.7(4.3) GeV for low (high) mass)
+    - 2X: + mhh cut (mhh < (>) 350 GeV for low (high) mass)
+    - 3X: + mhh cut "reversed" (mhh > (<) 350 GeV for low (high) mass)
   */
   bool IsEventSelected(int selectionType, ChrisLib::MapBranches mapBranches);
 
@@ -73,6 +74,7 @@ class HHAnalysis
 
   std::string m_savePathPlot;
   std::string m_outFileName;
+  std::string m_extraInfo;
 
   int m_selectionType;
 };

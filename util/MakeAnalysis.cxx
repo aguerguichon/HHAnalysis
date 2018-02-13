@@ -43,16 +43,19 @@ int main(int argc, char *argv[])
   if (vm.count("help")) {cout << desc; return 0;}
   //=========================================================
 
+  TFile *inFile{0};
   for (unsigned int iFile=0; iFile <configFiles.size(); iFile++){
     HHAnalysis hh ( configFiles[iFile] );
-
     hh.CreateSaveDistri();
 
-    TFile *inFile=TFile::Open( hh.GetOutFileName().c_str() );
-    
+    inFile=TFile::Open( hh.GetOutFileName().c_str() );
+
+    if (!inFile) throw invalid_argument("MakeAnalysis: File not created - "+hh.GetOutFileName());
+
     hh.DrawDistriForLambdas(inFile, "pdf");
-    inFile->Close();
+    inFile->Close("R");
   }
 
+  delete inFile; inFile=0;
   cout<<"End of program.\n";
 }

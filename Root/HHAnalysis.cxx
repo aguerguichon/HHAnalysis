@@ -40,6 +40,7 @@ HHAnalysis::HHAnalysis(string configFileName){
     ("savePathPlot", po::value<string>(&m_savePathPlot), "Path were the plots will be saved. Can be the absolute path or the absolute path+beginning of the name (name is of the form tagcatX_varY).")
     ("outFileName", po::value<string>(&m_outFileName), "Name of the root file where histograms will be stored.")
     ("selectionType", po::value<int>(&m_selectionType), "Type of selection basic (selectionType%10) or extra (selectionType/10)")
+    ("extraInfo", po::value<string>(&m_extraInfo)->default_value(""), "Extra information to be written on plots.")
     ;
   
   po::variables_map vm;
@@ -191,7 +192,6 @@ double HHAnalysis::getExpectedSignificance(TH1 *hBkg, TH1 *hSig, int mode, int m
 }
 
 //==================================================================================
-//void HHAnalysis::CreateSaveDistri(vector<string> vectInFiles, int selectionType, vector<string> vectVariables, vector<int> vectCategories, string outputFileName){
 void HHAnalysis::CreateSaveDistri(){
   cout<<"HHAnalysis::CreateSaveDistri\n";
 
@@ -204,9 +204,9 @@ void HHAnalysis::CreateSaveDistri(){
   TTree *inTree{0};
   list<string> listVariables(m_vectVariables.begin(),m_vectVariables.end());
   
-  listVariables.push_back("tagcat");
-  listVariables.push_back("weightMC"); listVariables.push_back("weightvertex"); listVariables.push_back("weightpileup"); listVariables.push_back("weightinit"); listVariables.push_back("Lumi"); listVariables.push_back("LumiMC"); listVariables.push_back("weightlowmass"); listVariables.push_back("weighthighmass");
-  listVariables.push_back("pTb1corlow"); listVariables.push_back("pTb2corlow"); listVariables.push_back("pTb1corhigh"); listVariables.push_back("pTb2corhigh"); listVariables.push_back("mbbcorlow"); listVariables.push_back("mbbcorhigh");
+  listVariables.merge({"tagcat"});
+  listVariables.merge({"weightMC", "weightvertex", "weightpileup", "weightinit","Lumi", "LumiMC", "weightlowmass", "weighthighmass"});
+  listVariables.merge({"pTb1corlow", "pTb2corlow", "pTb1corhigh", "pTb2corhigh", "mbbcorlow", "mbbcorhigh"});
 
   TH1::AddDirectory(kFALSE); 
 
@@ -215,6 +215,8 @@ void HHAnalysis::CreateSaveDistri(){
     if (!inFile) throw invalid_argument( "HHAnalysis::CreateSaveDistri: no file provided." );
     inTree=(TTree*)inFile->Get("ntuple");
     if (!inFile) throw invalid_argument( "HHAnalysis::CreateSaveDistri: no tree provided." );
+
+    gDirectory->pwd();
 
     MapBranches mapBranches; 
     mapBranches.LinkTreeBranches(inTree, 0, listVariables);
@@ -234,21 +236,32 @@ void HHAnalysis::CreateSaveDistri(){
 	  histName="tagcat"+to_string( mapBranches.GetInt("tagcat") )+"_var"+m_vectVariables[iVar]+"_sample"+*sampleName;
 
 	  if ( !mapHist.count(histName) ) mapHist[histName]= InitialiseHist(histName, m_vectVariables[iVar]); 
-	  mapHist[histName]->Fill( mapBranches.GetDouble( m_vectVariables[iVar].c_str() ), weight );
+	  if ( mapBranches.IsInt(m_vectVariables[iVar].c_str()) ) mapHist[histName]->Fill( mapBranches.GetInt( m_vectVariables[iVar].c_str() ), weight );
+	  else if ( m_vectVariables[iVar].find("phi")!=string::npos ) mapHist[histName]->Fill( mapBranches.GetDouble( m_vectVariables[iVar].c_str() )*180/acos(-1), weight );
+	  else mapHist[histName]->Fill( mapBranches.GetDouble( m_vectVariables[iVar].c_str() ), weight );
 	} // end iVar
       }//end iCat  
     } //end iEntry
-    inFile->Close();
+    inFile->Close("R");
   }//end iFile
 
   //Saving histograms in a root file to be post treated.
   TFile *outputFile=new TFile (m_outFileName.c_str(), "RECREATE");
-  for(auto &it : mapHist) it.second->Write();
-  outputFile->Close();
-  
+  if (!outputFile) throw invalid_argument("HHAnalysis::CreatSaveDistri outputFile does not exist.");
+  gDirectory->pwd();
+
+  for(auto it : mapHist) {
+    cout<<"it.first: "<<it.first<<" it.second: "<<it.second<<endl;
+    it.second->Write("", TObject::kWriteDelete);
+    delete it.second; it.second=0;
+  }
+  outputFile->Close("R");
+
+  delete outputFile; outputFile=0;  
   delete sampleName; sampleName=0;
   delete inFile; inFile=0; 
-  delete outputFile; outputFile=0;
+  mapHist.clear();
+  gROOT->Reset();
   cout<<"HHAnalysis::CreateSaveDistri done.\n";
 }
 
@@ -256,14 +269,22 @@ void HHAnalysis::CreateSaveDistri(){
 //==================================================================================
 bool HHAnalysis::IsEventSelected(int selectionType, MapBranches mapBranches){
 
-  if (selectionType%10 == 0 || selectionType%10 == 1) return true; //if no selection or isPassed (ie skimmed)
+  if (selectionType%10 == 0 || selectionType%10 == 1){ //unskimmed or isPassed (ie skimmed)
+    switch (selectionType/10){
+    case 0: {return true; break; } //no extra selection
+    case 2: { if (mapBranches.GetDouble("mbbgamgam")<350  ) return true; else return false; break;}
+    case 3: { if (mapBranches.GetDouble("mbbgamgam")>350  ) return true; else return false; break;} 
+    default: throw invalid_argument("HHAnalysis::IsEventSelected: the following selectionType does not exist for unskimmed of skimmed selection: "+selectionType);
+    }
+  }
 
   else if (selectionType%10 == 2){ //lowmass
     if ( !IsLowMass(mapBranches) ) return false;
     switch(selectionType/10){
-    case 1: { return true; break;} //basic low mass selection
-    case 2: { if (mapBranches.GetDouble("mgamgam")>120.39 && mapBranches.GetDouble("mgamgam")<129.79 ) return true; else return false; break;} //adding mgamgam cut
-    case 3: { if (mapBranches.GetDouble("mbbgamgam")<350  ) return true; else return false; break;} //adding mhh cut
+    case 0: { return true; break;} //basic low mass selection
+    case 1: { if (mapBranches.GetDouble("mgamgam")>120.39 && mapBranches.GetDouble("mgamgam")<129.79 ) return true; else return false; break;} //adding mgamgam cut
+    case 2: { if (mapBranches.GetDouble("mbbgamgam")<350  ) return true; else return false; break;} //adding mhh cut
+    case 3: { if (mapBranches.GetDouble("mbbgamgam")>350  ) return true; else return false; break;} //reversed mhh cut
     default: throw invalid_argument("HHAnalysis::IsEventSelected: the following selectionType does not exist for low mass selection: "+selectionType);
     }
   }
@@ -271,12 +292,14 @@ bool HHAnalysis::IsEventSelected(int selectionType, MapBranches mapBranches){
   else if (selectionType%10 == 3){ //highmass
     if ( !IsHighMass(mapBranches) ) return false;
     switch(selectionType/10){
-    case 1: { return true; break;} //basic high mass selection
-    case 2: { if (mapBranches.GetDouble("mgamgam")>120.79 && mapBranches.GetDouble("mgamgam")<129.39  ) return true; else return false; break;} //adding mgamgam cut
-    case 3: { if (mapBranches.GetDouble("mbbgamgam")>350  ) return true; else return false; break;}
+    case 0: { return true; break;} //basic high mass selection
+    case 1: { if (mapBranches.GetDouble("mgamgam")>120.79 && mapBranches.GetDouble("mgamgam")<129.39  ) return true; else return false; break;} //adding mgamgam cut
+    case 2: { if (mapBranches.GetDouble("mbbgamgam")>350  ) return true; else return false; break;}
+    case 3: { if (mapBranches.GetDouble("mbbgamgam")<350  ) return true; else return false; break;} //reversed mhh cut
     default: throw invalid_argument("HHAnalysis::IsEventSelected: the following selectionType does not exist for high mass selection: "+selectionType);
     }
   }
+  return false;
 }
 
 //==================================================================================
@@ -317,33 +340,32 @@ TH1D* HHAnalysis::InitialiseHist(string histName, string strVariable){
   else if (var.BeginsWith("m")) hist= new TH1D (histName.c_str(), "", 100, 0, 1000);
   else if (var.Contains("pT")) hist= new TH1D (histName.c_str(), "", 60, 0, 600);
   else if (var.BeginsWith("d")) hist= new TH1D (histName.c_str(), "", 25, 0, 5);
-  else if (var.Contains("eta") || var.Contains("phi")) hist= new TH1D (histName.c_str(), "", 1000, -5, 5);
+  else if (var.Contains("eta")) hist= new TH1D (histName.c_str(), "", 1000, -5, 5);
+  else if (var.Contains("phi")) hist= new TH1D (histName.c_str(), "", 18, -180, 180);
+  else if (var.BeginsWith("n") && var.Contains("jet")) hist= new TH1D (histName.c_str(), "", 10, 0, 10);
   else hist= new TH1D (histName.c_str(), "", 2000, -1000, 1000);
   return hist;
 }
 
 //==================================================================================
-//void HHAnalysis::DrawDistriForLambdas(TFile *inFile, vector<string> vectVariables, vector<int> vectCategories, vector<string> vectSamples, string path, string extension){
-
 void HHAnalysis::DrawDistriForLambdas(TFile *inFile, string extension){
   cout<<"HHAnalysis::DrawDistriForLambdas done.\n";
   TKey *key{0};
-  TH1D *hist{0};
   TClass *cl{0};
   TObjArray *objArrayString{0};
   string histName, plotName, catName, sampleName, varName, legLatex;
   map< string, vector<TH1*> > mapHist;
   vector <string> vectOpt;
   vector <double> vectExtremalBins;
-  vector <TH1*> vectHistTmp;
   TString tmp, name;
 
   TIter next( inFile->GetListOfKeys() );
   while ( (key = (TKey *) next()) ) { //iteration on the keys of the root file
     cl = gROOT->GetClass(key->GetClassName()); //getting the class of each key
     if (cl->InheritsFrom("TH1D")){ //loop over all histograms
-      hist = (TH1D*)key->ReadObj();
-      histName=hist->GetName();
+      //      hist = (TH1D*)key->ReadObj();
+      //      histName=hist->GetName();
+      histName = ((TH1D*)key->ReadObj())->GetName();
       for (unsigned int iCat=0; iCat<m_vectCategories.size(); iCat++){
 	for (unsigned int iVar=0; iVar<m_vectVariables.size(); iVar++){
 	  plotName="tagcat"+to_string(m_vectCategories[iCat])+"_var"+m_vectVariables[iVar];
@@ -351,7 +373,7 @@ void HHAnalysis::DrawDistriForLambdas(TFile *inFile, string extension){
 	  for (unsigned int iSample=0; iSample<m_vectSamples.size(); iSample++){
 	    if ( histName.find(plotName.c_str())==string::npos ) continue;
 	    if ( histName.find(m_vectSamples[iSample].c_str())==string::npos && m_vectSamples[iSample]!="ALL") continue;
-	    mapHist[plotName].push_back(hist);	    
+	    mapHist[plotName].push_back( (TH1D*)key->ReadObj() );	    
 	  }//end iSample
 	} //end it m_vectVariables
       }//end iCat
@@ -376,27 +398,27 @@ void HHAnalysis::DrawDistriForLambdas(TFile *inFile, string extension){
     } //end loop over hist
 
     DrawOptions drawOpt;
-    vectHistTmp=it.second;
     drawOpt.AddOption(vectOpt);
     drawOpt.AddOption("rangeUserX", (to_string(vectExtremalBins[0])+" "+to_string(vectExtremalBins[1])).c_str() );
     drawOpt.AddOption("outName", (m_savePathPlot+it.first).c_str() );
-    drawOpt.AddOption("legendPos", "0.75 0.9");
+    drawOpt.AddOption("legendPos", "0.8 0.9");
     drawOpt.AddOption("latex", ("Category "+ catName +" b-tag").c_str() );
-    drawOpt.AddOption("latexOpt", "0.45 0.8");
+    drawOpt.AddOption("latexOpt", "0.45 0.85");
+    if (m_extraInfo!="") {drawOpt.AddOption("latex", m_extraInfo.c_str()); drawOpt.AddOption("latexOpt", "0.45 0.8");}
     drawOpt.AddOption("xTitle", varName);
     drawOpt.AddOption("normalize", "1");
     drawOpt.AddOption("extension", extension);
-    drawOpt.Draw( vectHistTmp );
+    drawOpt.Draw( it.second );
     vectOpt.clear();
-    vectHistTmp.clear();
     vectExtremalBins.clear();
-
   }//end over key of map ie plots
+
+  for(auto &it : mapHist) { for (auto &h : it.second) {delete h; h=0;} }
+  mapHist.clear();
 
   delete key; key=0;
   delete cl; cl=0;
   delete objArrayString; objArrayString=0;
-  delete hist; hist=0;
   cout<<"HHAnalysis::DrawDistriForLambdas done.\n";
 }
 
