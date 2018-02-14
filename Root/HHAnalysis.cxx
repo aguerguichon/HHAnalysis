@@ -344,7 +344,7 @@ void HHAnalysis::DrawDistriForLambdas(string extension){
 
   TObjArray *objArrayString{0};
   string histName, plotName, catName, sampleName, varName, legLatex;
-  vector <string> vectOpt;
+  vector <string> vectOpt, vectHistNames;
   vector <double> vectExtremalBins;
   vector <TH1*> vectHistTmp;
   TString tmp, name;
@@ -391,15 +391,52 @@ void HHAnalysis::DrawDistriForLambdas(string extension){
       drawOpt.Draw( vectHistTmp );
       
       cout<<m_savePathPlot<<plotName<<"."<<extension<<" has been created.\n";
+      vectHistNames.push_back(m_savePathPlot+plotName);
       vectOpt.clear();
       vectExtremalBins.clear();
       vectHistTmp.clear();
     } //end iVar
   }//end iCat
   
+  plotName=m_savePathPlot+"Summary";
+  MakePdf( plotName, vectHistNames, m_extraInfo );
+  system( ("mv *Summary.pdf "+plotName+".pdf").c_str() );
+  system( "rm *Summary*"); 
+  
   delete objArrayString; objArrayString=0;
   cout<<"HHAnalysis::DrawDistriForLambdas done.\n";
 }
+
+
+
+
+//==================================================================================
+void HHAnalysis::MakePdf( string latexFileName, vector<string> vectHistNames, string comment ){
+  fstream stream;
+  latexFileName+=".tex";
+  stream.open( latexFileName.c_str(), fstream::out | fstream::trunc );
+  WriteLatexHeader( stream, "HH study" , "Antinea Guerguichon" );
+
+  stream <<comment <<"\\newline"<<endl;
+  stream << "\\indent Variables: ";
+  for (unsigned int iVar=0; iVar< m_vectVariables.size(); iVar++)    {
+    if (iVar == m_vectVariables.size()-1) stream<<m_vectVariables[iVar] <<"\\newline  ";
+    else  stream  << m_vectVariables[iVar] <<", ";
+  }
+
+  WriteLatexMinipage( stream, vectHistNames, 2);
+  stream << "\\end{document}" << endl;
+  string commandLine = "pdflatex  -interaction=batchmode " + latexFileName;
+  system( commandLine.c_str() );
+  system( commandLine.c_str() );
+  system( commandLine.c_str() );
+  stream.close();
+
+  cout<<"HHAnalysis::MakePdf "+latexFileName+"  Done"<<endl;
+}
+
+
+
 
 //==================================================================================
 vector<double> HHAnalysis::ReturnExtremalBins(TH1* hist){

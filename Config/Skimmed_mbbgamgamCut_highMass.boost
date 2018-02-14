@@ -17,5 +17,5 @@ category=2
 category=1
 sample=ALL
 outFileName=/sps/atlas/a/aguerguichon/HHAnalysis/DistriLO/HighMass_mhhCutHigh.root
-savePathPlot=/sps/atlas/a/aguerguichon/HHAnalysis/DistriLO/HighMass_mhhCutHigh__
+savePathPlot=/sps/atlas/a/aguerguichon/HHAnalysis/DistriLO/HighMass_mhhCutHigh_
 extraInfo=High mass selection, mhh > 350GeV

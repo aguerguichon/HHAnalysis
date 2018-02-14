@@ -60,6 +60,8 @@ class HHAnalysis
 
   void DrawDistriForLambdas(std::string extension="eps");
 
+  void MakePdf( std::string latexFileName, std::vector<std::string> vectHistNames, std::string comment );
+
   std::vector<double> ReturnExtremalBins(TH1* hist);
   
   // void DrawCompLONLOForLambdas(TFile *LOFile, TTree *LOTree, TFile *NLOFile, TTree *NLOTree, std::list<std::string> vectVariables, std::string savePathPlot);
