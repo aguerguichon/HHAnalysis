@@ -231,7 +231,7 @@ void HHAnalysis::CreateSaveDistri(){
       for (unsigned int iCat=0; iCat<m_vectCategories.size(); iCat++){
 	if ( mapBranches.GetInt("tagcat")!=m_vectCategories[iCat] ) continue;
 	for (unsigned int iVar=0; iVar<m_vectVariables.size(); iVar++ ){
-	  histName="tagcat"+to_string( mapBranches.GetInt("tagcat") )+"_var"+m_vectVariables[iVar]+"_sample"+*sampleName;
+	  histName="tagcat"+to_string( mapBranches.GetInt("tagcat") )+"-var"+m_vectVariables[iVar]+"-sample"+*sampleName;
 
 	  if ( !m_mapHist.count(histName) ) { InitialiseHist(m_mapHist[histName], histName, m_vectVariables[iVar] );} 
 	  if ( mapBranches.IsInt(m_vectVariables[iVar].c_str()) ) m_mapHist[histName]->Fill( mapBranches.GetInt( m_vectVariables[iVar].c_str() ), weight );
@@ -330,7 +330,7 @@ void HHAnalysis::InitialiseHist(TH1D* &hist, string histName, string strVariable
   else if (var.BeginsWith("m")) hist= new TH1D (histName.c_str(), "", 100, 0, 1000);
   else if (var.Contains("pT")) hist= new TH1D (histName.c_str(), "", 60, 0, 600);
   else if (var.BeginsWith("d")) hist= new TH1D (histName.c_str(), "", 25, 0, 5);
-  else if (var.Contains("eta")) hist= new TH1D (histName.c_str(), "", 1000, -5, 5);
+  else if (var.Contains("eta")) hist= new TH1D (histName.c_str(), "", 50, -5, 5);
   else if (var.Contains("phi")) hist= new TH1D (histName.c_str(), "", 18, -180, 180);
   else if (var.BeginsWith("n") && var.Contains("jet")) hist= new TH1D (histName.c_str(), "", 10, 0, 10);
   else hist= new TH1D (histName.c_str(), "", 2000, -1000, 1000);
@@ -353,17 +353,18 @@ void HHAnalysis::DrawDistriForLambdas(string extension){
     for (unsigned int iVar=0; iVar<m_vectVariables.size(); iVar++){
       vectExtremalBins.push_back(15e10); //arbitrary value
       vectExtremalBins.push_back(0);
-        plotName="tagcat"+to_string(m_vectCategories[iCat])+"_var"+m_vectVariables[iVar];
+      plotName="tagcat"+to_string(m_vectCategories[iCat])+"-var"+m_vectVariables[iVar];
       for(auto &it : m_mapHist){ //it.first =histName, it.second=hist
-	if ( it.first.find(plotName.c_str())==string::npos ) continue;
+	name=it.first;
+	if ( !name.BeginsWith((plotName+"-").c_str()) ) continue;
 	if (m_vectSamples[0]!="ALL"){
 	  for (unsigned int iSample=0; iSample<m_vectSamples.size(); iSample++){
-	    if ( it.first.find(m_vectSamples[iSample].c_str())==string::npos ) continue;
+	    if ( !name.EndsWith(m_vectSamples[iSample].c_str()) ) continue;
 	  } //end iSample
 	}// end if m_vectSamples[0]!="ALL"
 
 	name=it.second->GetName();
-	objArrayString = name.Tokenize("_");
+	objArrayString = name.Tokenize("-");
 	for(int iString=0; iString<objArrayString->GetEntriesFast(); iString++){
 	  tmp = ((TObjString*)objArrayString->At(iString))->GetString();
 	  if ( tmp.Contains("tagcat") ){ catName=tmp.ReplaceAll("tagcat","");}
@@ -413,6 +414,7 @@ void HHAnalysis::DrawDistriForLambdas(string extension){
 //==================================================================================
 void HHAnalysis::MakePdf( string latexFileName, vector<string> vectHistNames, string comment ){
   fstream stream;
+  string var;
   latexFileName+=".tex";
   stream.open( latexFileName.c_str(), fstream::out | fstream::trunc );
   WriteLatexHeader( stream, "HH study" , "Antinea Guerguichon" );
@@ -420,8 +422,14 @@ void HHAnalysis::MakePdf( string latexFileName, vector<string> vectHistNames, st
   stream <<comment <<"\\newline"<<endl;
   stream << "\\indent Variables: ";
   for (unsigned int iVar=0; iVar< m_vectVariables.size(); iVar++)    {
-    if (iVar == m_vectVariables.size()-1) stream<<m_vectVariables[iVar] <<"\\newline  ";
-    else  stream  << m_vectVariables[iVar] <<", ";
+    if (m_vectVariables[iVar].find("_")!=string::npos) var=ReplaceString("_", "\\_")(m_vectVariables[iVar]);
+    else var=m_vectVariables[iVar];
+
+    if (iVar == m_vectVariables.size()-1) stream<< var <<"\\newline  ";
+    else  stream  << var <<", ";
+    // if (iVar == m_vectVariables.size()-1) stream<<m_vectVariables[iVar] <<"\\newline  ";
+    // else  stream  << m_vectVariables[iVar] <<", ";
+
   }
 
   WriteLatexMinipage( stream, vectHistNames, 2);

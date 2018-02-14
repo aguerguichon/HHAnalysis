@@ -1,5 +1,5 @@
 inFile=/sps/atlas/d/delgove/private/HH/tree_v19/skim_file/LOSignal.root
-selectionType=31
+selectionType=33
 variable=mbbgamgam
 variable=pTb1
 variable=pTb2
@@ -25,6 +25,6 @@ variable=mbbgamgam_modified
 category=2
 category=1
 sample=ALL
-outFileName=/sps/atlas/a/aguerguichon/HHAnalysis/DistriLO/isPassed_mhhCutHigh.root
-savePathPlot=/sps/atlas/a/aguerguichon/HHAnalysis/DistriLO/isPassed_mhhCutHigh_
-extraInfo=isPassed, mhh > 350GeV
+outFileName=/sps/atlas/a/aguerguichon/HHAnalysis/DistriLO/HighMass_mhhCutLow.root
+savePathPlot=/sps/atlas/a/aguerguichon/HHAnalysis/DistriLO/HighMass_mhhCutLow_
+extraInfo=High mass selection, mhh < 350GeV
