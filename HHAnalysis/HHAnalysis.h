@@ -58,7 +58,7 @@ class HHAnalysis
 
   void InitialiseHist(TH1D* &hist, std::string histName, std::string variable); 
 
-  void DrawDistriForLambdas(TFile *inFile, std::string extension="eps");
+  void DrawDistriForLambdas(std::string extension="eps");
 
   std::vector<double> ReturnExtremalBins(TH1* hist);
   
@@ -67,6 +67,8 @@ class HHAnalysis
   std::string GetOutFileName();
 
  private:
+  std::map <std::string, TH1D*> m_mapHist;
+
   std::vector <std::string> m_vectInFiles;
   std::vector <std::string> m_vectVariables;
   std::vector <std::string> m_vectSamples;

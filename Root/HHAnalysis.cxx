@@ -53,6 +53,7 @@ HHAnalysis::HHAnalysis(string configFileName){
 
 
 HHAnalysis::~HHAnalysis(){
+  m_mapHist.clear();
   m_vectInFiles.clear();
   m_vectVariables.clear();
   m_vectSamples.clear();
@@ -195,7 +196,6 @@ double HHAnalysis::getExpectedSignificance(TH1 *hBkg, TH1 *hSig, int mode, int m
 void HHAnalysis::CreateSaveDistri(){
   cout<<"HHAnalysis::CreateSaveDistri\n";
 
-  map< string, TH1D* > mapHist;
   string *sampleName=new string;
   string histName;
   TBranch *sampleBranch; //!
@@ -216,8 +216,6 @@ void HHAnalysis::CreateSaveDistri(){
     inTree=(TTree*)inFile->Get("ntuple");
     if (!inFile) throw invalid_argument( "HHAnalysis::CreateSaveDistri: no tree provided." );
 
-    gDirectory->pwd();
-
     MapBranches mapBranches; 
     mapBranches.LinkTreeBranches(inTree, 0, listVariables);
     inTree->SetBranchStatus("sample", 1);
@@ -229,17 +227,16 @@ void HHAnalysis::CreateSaveDistri(){
       weight=GetWeight(m_selectionType%10, mapBranches);
       if ( m_vectInFiles[iFile].find("LO")!=string::npos ) weight*=0.34*2.28;
 	
-      //Create entries of mapHist and fill hists
+      //Create entries of m_mapHist and fill hists
       for (unsigned int iCat=0; iCat<m_vectCategories.size(); iCat++){
 	if ( mapBranches.GetInt("tagcat")!=m_vectCategories[iCat] ) continue;
 	for (unsigned int iVar=0; iVar<m_vectVariables.size(); iVar++ ){
 	  histName="tagcat"+to_string( mapBranches.GetInt("tagcat") )+"_var"+m_vectVariables[iVar]+"_sample"+*sampleName;
 
-	  //	  if ( !mapHist.count(histName) ) mapHist[histName]= InitialiseHist(histName, m_vectVariables[iVar]); 
-	  if ( !mapHist.count(histName) ) { mapHist[histName]=0; InitialiseHist(mapHist[histName], histName, m_vectVariables[iVar] );} 
-	  if ( mapBranches.IsInt(m_vectVariables[iVar].c_str()) ) mapHist[histName]->Fill( mapBranches.GetInt( m_vectVariables[iVar].c_str() ), weight );
-	  else if ( m_vectVariables[iVar].find("phi")!=string::npos ) mapHist[histName]->Fill( mapBranches.GetDouble( m_vectVariables[iVar].c_str() )*180/acos(-1), weight );
-	  else mapHist[histName]->Fill( mapBranches.GetDouble( m_vectVariables[iVar].c_str() ), weight );
+	  if ( !m_mapHist.count(histName) ) { InitialiseHist(m_mapHist[histName], histName, m_vectVariables[iVar] );} 
+	  if ( mapBranches.IsInt(m_vectVariables[iVar].c_str()) ) m_mapHist[histName]->Fill( mapBranches.GetInt( m_vectVariables[iVar].c_str() ), weight );
+	  else if ( m_vectVariables[iVar].find("phi")!=string::npos ) m_mapHist[histName]->Fill( mapBranches.GetDouble( m_vectVariables[iVar].c_str() )*180/acos(-1), weight );
+	  else m_mapHist[histName]->Fill( mapBranches.GetDouble( m_vectVariables[iVar].c_str() ), weight );
 	} // end iVar
       }//end iCat  
     } //end iEntry
@@ -249,20 +246,13 @@ void HHAnalysis::CreateSaveDistri(){
   //Saving histograms in a root file to be post treated.
   TFile *outputFile=new TFile (m_outFileName.c_str(), "RECREATE");
   if (!outputFile) throw invalid_argument("HHAnalysis::CreatSaveDistri outputFile does not exist.");
-  gDirectory->pwd();
-
-  for(auto it : mapHist) {
-    cout<<"it.first: "<<it.first<<" it.second: "<<it.second<<endl;
-    it.second->Write("", TObject::kWriteDelete);
-    delete it.second; it.second=0;
-  }
+  for(auto it : m_mapHist) it.second->Write("", TObject::kWriteDelete);
   outputFile->Close("R");
-
+  cout<<"Histograms saved in "<<m_outFileName<<endl;
+  
   delete outputFile; outputFile=0;  
   delete sampleName; sampleName=0;
   delete inFile; inFile=0; 
-  mapHist.clear();
-  gROOT->Reset();
   cout<<"HHAnalysis::CreateSaveDistri done.\n";
 }
 
@@ -349,74 +339,64 @@ void HHAnalysis::InitialiseHist(TH1D* &hist, string histName, string strVariable
 
 
 //==================================================================================
-void HHAnalysis::DrawDistriForLambdas(TFile *inFile, string extension){
+void HHAnalysis::DrawDistriForLambdas(string extension){
   cout<<"HHAnalysis::DrawDistriForLambdas done.\n";
-  TKey *key{0};
-  TClass *cl{0};
+
   TObjArray *objArrayString{0};
   string histName, plotName, catName, sampleName, varName, legLatex;
-  map< string, vector<TH1*> > mapHist;
   vector <string> vectOpt;
   vector <double> vectExtremalBins;
+  vector <TH1*> vectHistTmp;
   TString tmp, name;
 
-  TIter next( inFile->GetListOfKeys() );
-  while ( (key = (TKey *) next()) ) { //iteration on the keys of the root file
-    cl = gROOT->GetClass(key->GetClassName()); //getting the class of each key
-    if (cl->InheritsFrom("TH1D")){ //loop over all histograms
-      histName = ((TH1D*)key->ReadObj())->GetName();
-      for (unsigned int iCat=0; iCat<m_vectCategories.size(); iCat++){
-	for (unsigned int iVar=0; iVar<m_vectVariables.size(); iVar++){
-	  plotName="tagcat"+to_string(m_vectCategories[iCat])+"_var"+m_vectVariables[iVar];
-	  if ( !mapHist.count(plotName) ) mapHist[plotName];
+  for (unsigned int iCat=0; iCat<m_vectCategories.size(); iCat++){
+    for (unsigned int iVar=0; iVar<m_vectVariables.size(); iVar++){
+      vectExtremalBins.push_back(15e10); //arbitrary value
+      vectExtremalBins.push_back(0);
+        plotName="tagcat"+to_string(m_vectCategories[iCat])+"_var"+m_vectVariables[iVar];
+      for(auto &it : m_mapHist){ //it.first =histName, it.second=hist
+	if ( it.first.find(plotName.c_str())==string::npos ) continue;
+	if (m_vectSamples[0]!="ALL"){
 	  for (unsigned int iSample=0; iSample<m_vectSamples.size(); iSample++){
-	    if ( histName.find(plotName.c_str())==string::npos ) continue;
-	    if ( histName.find(m_vectSamples[iSample].c_str())==string::npos && m_vectSamples[iSample]!="ALL") continue;
-	    mapHist[plotName].push_back( (TH1D*)key->ReadObj() );	    
-	  }//end iSample
-	} //end it m_vectVariables
-      }//end iCat
-    } //if Inherits
-  } //end while
+	    if ( it.first.find(m_vectSamples[iSample].c_str())==string::npos ) continue;
+	  } //end iSample
+	}// end if m_vectSamples[0]!="ALL"
 
-  for(auto &it : mapHist) {
-    vectExtremalBins.push_back(0);
-    vectExtremalBins.push_back(0);
-    for (auto &h : it.second) {
-      name=h->GetName();
-      objArrayString = name.Tokenize("_");
-      for(int iString=0; iString<objArrayString->GetEntriesFast(); iString++){
-	tmp = ((TObjString*)objArrayString->At(iString))->GetString();
-	if ( tmp.Contains("tagcat") ){ catName=tmp.ReplaceAll("tagcat","");}
-	if ( tmp.Contains("var") ) varName=tmp.ReplaceAll("var","");
-	if ( tmp.Contains("sample") ) sampleName=tmp.ReplaceAll("sample","");
-      }
-      vectOpt.push_back( ("legend="+ sampleName ).c_str() );
-      if ( ReturnExtremalBins(h)[0]<vectExtremalBins[0] ) vectExtremalBins[0]=ReturnExtremalBins(h)[0];
-      if ( ReturnExtremalBins(h)[1]>vectExtremalBins[1] ) vectExtremalBins[1]=ReturnExtremalBins(h)[1];
-    } //end loop over hist
+	name=it.second->GetName();
+	objArrayString = name.Tokenize("_");
+	for(int iString=0; iString<objArrayString->GetEntriesFast(); iString++){
+	  tmp = ((TObjString*)objArrayString->At(iString))->GetString();
+	  if ( tmp.Contains("tagcat") ){ catName=tmp.ReplaceAll("tagcat","");}
+	  if ( tmp.Contains("var") ) varName=tmp.ReplaceAll("var","");
+	  if ( tmp.Contains("sample") ) sampleName=tmp.ReplaceAll("sample","");
+	}
+	vectOpt.push_back( ("legend="+ sampleName ).c_str() );
+	
+	if ( ReturnExtremalBins(it.second)[0]<vectExtremalBins[0] ) vectExtremalBins[0]=ReturnExtremalBins(it.second)[0];
+	if ( ReturnExtremalBins(it.second)[1]>vectExtremalBins[1] ) vectExtremalBins[1]=ReturnExtremalBins(it.second)[1];
+	vectHistTmp.push_back(it.second);
+      } // end it m_mapHist ie loop over hist
 
-    DrawOptions drawOpt;
-    drawOpt.AddOption(vectOpt);
-    drawOpt.AddOption("rangeUserX", (to_string(vectExtremalBins[0])+" "+to_string(vectExtremalBins[1])).c_str() );
-    drawOpt.AddOption("outName", (m_savePathPlot+it.first).c_str() );
-    drawOpt.AddOption("legendPos", "0.8 0.9");
-    drawOpt.AddOption("latex", ("Category "+ catName +" b-tag").c_str() );
-    drawOpt.AddOption("latexOpt", "0.45 0.85");
-    if (m_extraInfo!="") {drawOpt.AddOption("latex", m_extraInfo.c_str()); drawOpt.AddOption("latexOpt", "0.45 0.8");}
-    drawOpt.AddOption("xTitle", varName);
-    drawOpt.AddOption("normalize", "1");
-    drawOpt.AddOption("extension", extension);
-    drawOpt.Draw( it.second );
-    vectOpt.clear();
-    vectExtremalBins.clear();
-  }//end over key of map ie plots
-
-  for(auto &it : mapHist) { for (auto &h : it.second) {delete h; h=0;} }
-  mapHist.clear();
-
-  delete key; key=0;
-  delete cl; cl=0;
+      DrawOptions drawOpt;
+      drawOpt.AddOption(vectOpt);
+      drawOpt.AddOption("rangeUserX", (to_string(vectExtremalBins[0])+" "+to_string(vectExtremalBins[1])).c_str() );
+      drawOpt.AddOption("outName", (m_savePathPlot+plotName).c_str() );
+      drawOpt.AddOption("legendPos", "0.8 0.9");
+      drawOpt.AddOption("latex", ("Category "+ catName +" b-tag").c_str() );
+      drawOpt.AddOption("latexOpt", "0.45 0.85");
+      if (m_extraInfo!="") {drawOpt.AddOption("latex", m_extraInfo.c_str()); drawOpt.AddOption("latexOpt", "0.45 0.8");}
+      drawOpt.AddOption("xTitle", varName);
+      drawOpt.AddOption("normalize", "1");
+      drawOpt.AddOption("extension", extension);
+      drawOpt.Draw( vectHistTmp );
+      
+      cout<<m_savePathPlot<<plotName<<"."<<extension<<" has been created.\n";
+      vectOpt.clear();
+      vectExtremalBins.clear();
+      vectHistTmp.clear();
+    } //end iVar
+  }//end iCat
+  
   delete objArrayString; objArrayString=0;
   cout<<"HHAnalysis::DrawDistriForLambdas done.\n";
 }

@@ -14,6 +14,7 @@
 #include "TH1.h"
 #include "TH1D.h"
 #include "TROOT.h"
+#include "TError.h"
 
 #include "HHAnalysis/HHAnalysis.h"
 
@@ -43,19 +44,13 @@ int main(int argc, char *argv[])
   if (vm.count("help")) {cout << desc; return 0;}
   //=========================================================
 
-  TFile *inFile{0};
+  gErrorIgnoreLevel =kError; //removes warnings from root
+
   for (unsigned int iFile=0; iFile <configFiles.size(); iFile++){
     HHAnalysis hh ( configFiles[iFile] );
     hh.CreateSaveDistri();
-
-    inFile=TFile::Open( hh.GetOutFileName().c_str() );
-
-    if (!inFile) throw invalid_argument("MakeAnalysis: File not created - "+hh.GetOutFileName());
-
-    hh.DrawDistriForLambdas(inFile, "pdf");
-    inFile->Close("R");
+    hh.DrawDistriForLambdas("pdf");
   }
 
-  delete inFile; inFile=0;
   cout<<"End of program.\n";
 }
