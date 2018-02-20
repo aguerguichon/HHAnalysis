@@ -28,7 +28,7 @@ class HHAnalysis
   /**\brief Creates an histogram for each category of btag, each sample and each variable of interest. Saves the TH1D* of output in a root file.
    */
   //  void CreateSaveDistri(std::vector<std::string> vectInFiles, int selectionType, std::vector<std::string> vectVariables, std::vector<int> vectCategories, std::string outputFileName);
-  void CreateSaveDistri();
+  void CreateSaveDistri(bool saveMassForWorkspace=0);
 
   /**\brief Returns the weight according to the weightType:
     - 0: for no selection weightMC*weightvertex*weightpileup*Lumi/LumiMC (default)
@@ -62,6 +62,7 @@ class HHAnalysis
 
   void MakePdf( std::string latexFileName, std::vector<std::string> vectHistNames, std::string comment );
 
+  void SaveYields();
   std::vector<double> ReturnExtremalBins(TH1* hist);
   
   // void DrawCompLONLOForLambdas(TFile *LOFile, TTree *LOTree, TFile *NLOFile, TTree *NLOTree, std::list<std::string> vectVariables, std::string savePathPlot);

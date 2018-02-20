@@ -48,7 +48,8 @@ int main(int argc, char *argv[])
 
   for (unsigned int iFile=0; iFile <configFiles.size(); iFile++){
     HHAnalysis hh ( configFiles[iFile] );
-    hh.CreateSaveDistri();
+    hh.CreateSaveDistri(1);
+    hh.SaveYields();
     hh.DrawDistriForLambdas("pdf");
   }
 

@@ -193,7 +193,7 @@ double HHAnalysis::getExpectedSignificance(TH1 *hBkg, TH1 *hSig, int mode, int m
 }
 
 //==================================================================================
-void HHAnalysis::CreateSaveDistri(){
+void HHAnalysis::CreateSaveDistri(bool saveMassForWorkspace){
   cout<<"HHAnalysis::CreateSaveDistri\n";
 
   string *sampleName=new string;
@@ -203,7 +203,8 @@ void HHAnalysis::CreateSaveDistri(){
   TFile *inFile{0};
   TTree *inTree{0};
   list<string> listVariables(m_vectVariables.begin(),m_vectVariables.end());
-  
+  bool doSave=0; vector <ofstream*> vectOfstream(m_vectCategories.size()); 
+
   listVariables.merge({"tagcat"});
   listVariables.merge({"weightMC", "weightvertex", "weightpileup", "weightinit","Lumi", "LumiMC", "weightlowmass", "weighthighmass"});
   listVariables.merge({"pTb1corlow", "pTb2corlow", "pTb1corhigh", "pTb2corhigh", "mbbcorlow", "mbbcorhigh"});
@@ -216,40 +217,52 @@ void HHAnalysis::CreateSaveDistri(){
     inTree=(TTree*)inFile->Get("ntuple");
     if (!inFile) throw invalid_argument( "HHAnalysis::CreateSaveDistri: no tree provided." );
 
-    MapBranches mapBranches; 
-    mapBranches.LinkTreeBranches(inTree, 0, listVariables);
+    if (saveMassForWorkspace && m_vectInFiles[iFile].find("Data")!=string::npos) {
+      for (unsigned int iCat=0; iCat<m_vectCategories.size(); iCat++){
+	vectOfstream[iCat] = new ofstream( (m_savePathPlot+"tagcat"+to_string(m_vectCategories[iCat])+"_selection"+to_string(m_selectionType)+".csv").c_str(), ios::out);
+      }
+      doSave=1;}
+
+    MapBranches MB; 
+    MB.LinkTreeBranches(inTree, 0, listVariables);
     inTree->SetBranchStatus("sample", 1);
     inTree->SetBranchAddress("sample", &sampleName, &sampleBranch);
   
     for (unsigned int iEntry=0; iEntry<inTree->GetEntries(); iEntry++){
       inTree->GetEntry(iEntry);
-      if ( !IsEventSelected(m_selectionType, mapBranches) ) continue;
-      weight=GetWeight(m_selectionType%10, mapBranches);
+      if ( !IsEventSelected(m_selectionType, MB) ) continue;
+      weight=GetWeight(m_selectionType%10, MB);
       if ( m_vectInFiles[iFile].find("LO")!=string::npos ) weight*=0.34*2.28;
 	
       //Create entries of m_mapHist and fill hists
       for (unsigned int iCat=0; iCat<m_vectCategories.size(); iCat++){
-	if ( mapBranches.GetInt("tagcat")!=m_vectCategories[iCat] ) continue;
+	if ( MB.GetInt("tagcat")!=m_vectCategories[iCat] ) continue;
+	if (doSave) { 
+	  if (m_selectionType%10==2) *vectOfstream[iCat]<<MB.GetDouble("mgamgam")<<","<<MB.GetDouble("mbbcorlow")<<","<<MB.GetDouble("mbbgamgamcorlow")<<","<<MB.GetDouble("mbbgamgamcorlowmodified")<<","<<"1.0"<<"\n";
+	  if (m_selectionType%10==3) *vectOfstream[iCat]<<MB.GetDouble("mgamgam")<<","<<MB.GetDouble("mbbcorhigh")<<","<<MB.GetDouble("mbbgamgamcorhigh")<<","<<MB.GetDouble("mbbgamgamcorhighmodified")<<","<<"1.0"<<"\n";
+	}
 	for (unsigned int iVar=0; iVar<m_vectVariables.size(); iVar++ ){
-	  histName="tagcat"+to_string( mapBranches.GetInt("tagcat") )+"-var"+m_vectVariables[iVar]+"-sample"+*sampleName;
+	  histName="tagcat"+to_string( MB.GetInt("tagcat") )+"_var"+m_vectVariables[iVar]+"_sample"+*sampleName;
 
 	  if ( !m_mapHist.count(histName) ) { InitialiseHist(m_mapHist[histName], histName, m_vectVariables[iVar] );} 
-	  if ( mapBranches.IsInt(m_vectVariables[iVar].c_str()) ) m_mapHist[histName]->Fill( mapBranches.GetInt( m_vectVariables[iVar].c_str() ), weight );
-	  else if ( m_vectVariables[iVar].find("phi")!=string::npos ) m_mapHist[histName]->Fill( mapBranches.GetDouble( m_vectVariables[iVar].c_str() )*180/acos(-1), weight );
-	  else m_mapHist[histName]->Fill( mapBranches.GetDouble( m_vectVariables[iVar].c_str() ), weight );
+	  if ( MB.IsInt(m_vectVariables[iVar].c_str()) ) m_mapHist[histName]->Fill( MB.GetInt( m_vectVariables[iVar].c_str() ), weight );
+	  else if ( m_vectVariables[iVar].find("phi")!=string::npos ) m_mapHist[histName]->Fill( MB.GetDouble( m_vectVariables[iVar].c_str() )*180/acos(-1), weight );
+	  else m_mapHist[histName]->Fill( MB.GetDouble( m_vectVariables[iVar].c_str() ), weight );
 	} // end iVar
       }//end iCat  
     } //end iEntry
     inFile->Close("R");
   }//end iFile
 
-  //Saving histograms in a root file to be post treated.
+  //Saving histograms in a root file
   TFile *outputFile=new TFile (m_outFileName.c_str(), "RECREATE");
   if (!outputFile) throw invalid_argument("HHAnalysis::CreatSaveDistri outputFile does not exist.");
   for(auto it : m_mapHist) it.second->Write("", TObject::kWriteDelete);
   outputFile->Close("R");
   cout<<"Histograms saved in "<<m_outFileName<<endl;
   
+  if (doSave) {for (unsigned int iStream=0; iStream<vectOfstream.size(); iStream++){vectOfstream[iStream]->close();} }
+  vectOfstream.clear();
   delete outputFile; outputFile=0;  
   delete sampleName; sampleName=0;
   delete inFile; inFile=0; 
@@ -258,35 +271,35 @@ void HHAnalysis::CreateSaveDistri(){
 
 
 //==================================================================================
-bool HHAnalysis::IsEventSelected(int selectionType, MapBranches mapBranches){
+bool HHAnalysis::IsEventSelected(int selectionType, MapBranches MB){
 
   if (selectionType%10 == 0 || selectionType%10 == 1){ //unskimmed or isPassed (ie skimmed)
     switch (selectionType/10){
     case 0: {return true; break; } //no extra selection
-    case 2: { if (mapBranches.GetDouble("mbbgamgam")<350  ) return true; else return false; break;}
-    case 3: { if (mapBranches.GetDouble("mbbgamgam")>350  ) return true; else return false; break;} 
+    case 2: { if (MB.GetDouble("mbbgamgam")<350  ) return true; else return false; break;}
+    case 3: { if (MB.GetDouble("mbbgamgam")>350  ) return true; else return false; break;} 
     default: throw invalid_argument("HHAnalysis::IsEventSelected: the following selectionType does not exist for unskimmed of skimmed selection: "+selectionType);
     }
   }
 
   else if (selectionType%10 == 2){ //lowmass
-    if ( !IsLowMass(mapBranches) ) return false;
+    if ( !IsLowMass(MB) ) return false;
     switch(selectionType/10){
     case 0: { return true; break;} //basic low mass selection
-    case 1: { if (mapBranches.GetDouble("mgamgam")>120.39 && mapBranches.GetDouble("mgamgam")<129.79 ) return true; else return false; break;} //adding mgamgam cut
-    case 2: { if (mapBranches.GetDouble("mbbgamgam")<350  ) return true; else return false; break;} //adding mhh cut
-    case 3: { if (mapBranches.GetDouble("mbbgamgam")>350  ) return true; else return false; break;} //reversed mhh cut
+    case 1: { if (MB.GetDouble("mgamgam")>120.39 && MB.GetDouble("mgamgam")<129.79 ) return true; else return false; break;} //adding mgamgam cut
+    case 2: { if (MB.GetDouble("mbbgamgam")<350  ) return true; else return false; break;} //adding mhh cut
+    case 3: { if (MB.GetDouble("mbbgamgam")>350  ) return true; else return false; break;} //reversed mhh cut
     default: throw invalid_argument("HHAnalysis::IsEventSelected: the following selectionType does not exist for low mass selection: "+selectionType);
     }
   }
 
   else if (selectionType%10 == 3){ //highmass
-    if ( !IsHighMass(mapBranches) ) return false;
+    if ( !IsHighMass(MB) ) return false;
     switch(selectionType/10){
     case 0: { return true; break;} //basic high mass selection
-    case 1: { if (mapBranches.GetDouble("mgamgam")>120.79 && mapBranches.GetDouble("mgamgam")<129.39  ) return true; else return false; break;} //adding mgamgam cut
-    case 2: { if (mapBranches.GetDouble("mbbgamgam")>350  ) return true; else return false; break;}
-    case 3: { if (mapBranches.GetDouble("mbbgamgam")<350  ) return true; else return false; break;} //reversed mhh cut
+    case 1: { if (MB.GetDouble("mgamgam")>120.79 && MB.GetDouble("mgamgam")<129.39  ) return true; else return false; break;} //adding mgamgam cut
+    case 2: { if (MB.GetDouble("mbbgamgam")>350  ) return true; else return false; break;}
+    case 3: { if (MB.GetDouble("mbbgamgam")<350  ) return true; else return false; break;} //reversed mhh cut
     default: throw invalid_argument("HHAnalysis::IsEventSelected: the following selectionType does not exist for high mass selection: "+selectionType);
     }
   }
@@ -294,15 +307,15 @@ bool HHAnalysis::IsEventSelected(int selectionType, MapBranches mapBranches){
 }
 
 //==================================================================================
-double HHAnalysis::GetWeight(int weightType, MapBranches mapBranches){
+double HHAnalysis::GetWeight(int weightType, MapBranches MB){
   double weight{0};
   switch (weightType){
-  case 0: {weight=mapBranches.GetDouble("weightMC")*mapBranches.GetDouble("weightvertex")*mapBranches.GetDouble("weightpileup")*(mapBranches.GetDouble("Lumi")/mapBranches.GetDouble("LumiMC") ); break;} //for no selection cut at all
-  case 1:{ weight=mapBranches.GetDouble("weightinit")*(mapBranches.GetDouble("Lumi")/mapBranches.GetDouble("LumiMC") ); break;} //for selection cut at isPassed (equivalent to skimmed files)
-  case 2:{weight=mapBranches.GetDouble("weightlowmass"); break;}
-  case 3:{weight=mapBranches.GetDouble("weighthighmass"); break;}
+  case 0: {weight=MB.GetDouble("weightMC")*MB.GetDouble("weightvertex")*MB.GetDouble("weightpileup")*(MB.GetDouble("Lumi")/MB.GetDouble("LumiMC") ); break;} //for no selection cut at all
+  case 1:{ weight=MB.GetDouble("weightinit")*(MB.GetDouble("Lumi")/MB.GetDouble("LumiMC") ); break;} //for selection cut at isPassed (equivalent to skimmed files)
+  case 2:{weight=MB.GetDouble("weightlowmass"); break;}
+  case 3:{weight=MB.GetDouble("weighthighmass"); break;}
 
-  default: weight=mapBranches.GetDouble("weightMC")*mapBranches.GetDouble("weightvertex")*mapBranches.GetDouble("weightpileup")*(mapBranches.GetDouble("Lumi")/mapBranches.GetDouble("LumiMC") ); //no selection at all
+  default: weight=MB.GetDouble("weightMC")*MB.GetDouble("weightvertex")*MB.GetDouble("weightpileup")*(MB.GetDouble("Lumi")/MB.GetDouble("LumiMC") ); //no selection at all
   }
   
   return weight;
@@ -310,15 +323,15 @@ double HHAnalysis::GetWeight(int weightType, MapBranches mapBranches){
 
 
 //=================================================================================
-bool HHAnalysis::IsLowMass(MapBranches mapBranches){
-  if ( mapBranches.GetDouble("pTb1corlow")>40 && mapBranches.GetDouble("pTb2corlow")>25 && mapBranches.GetDouble("mbbcorlow")>80 && mapBranches.GetDouble("mbbcorlow")<140 ) return true;
+bool HHAnalysis::IsLowMass(MapBranches MB){
+  if ( MB.GetDouble("pTb1corlow")>40 && MB.GetDouble("pTb2corlow")>25 && MB.GetDouble("mbbcorlow")>80 && MB.GetDouble("mbbcorlow")<140 ) return true;
   else return false;
 }
 
 
 //=================================================================================
-bool HHAnalysis::IsHighMass(MapBranches mapBranches){
-  if ( mapBranches.GetDouble("pTb1corhigh")>100 && mapBranches.GetDouble("pTb2corhigh")>30 && mapBranches.GetDouble("mbbcorhigh")>90 && mapBranches.GetDouble("mbbcorhigh")<140 ) return true;
+bool HHAnalysis::IsHighMass(MapBranches MB){
+  if ( MB.GetDouble("pTb1corhigh")>100 && MB.GetDouble("pTb2corhigh")>30 && MB.GetDouble("mbbcorhigh")>90 && MB.GetDouble("mbbcorhigh")<140 ) return true;
   else return false;
 }
 
@@ -327,6 +340,9 @@ bool HHAnalysis::IsHighMass(MapBranches mapBranches){
 void HHAnalysis::InitialiseHist(TH1D* &hist, string histName, string strVariable){
   TString var=strVariable;
   if (var.Contains("mv2c")) hist= new TH1D (histName.c_str(), "", 200, -1, 1);
+  else if (var.BeginsWith("mgamgam")) hist= new TH1D (histName.c_str(), "", 60, 110, 140);
+  else if (var=="mbb") hist= new TH1D (histName.c_str(), "", 40, 0, 200);
+  else if (var.BeginsWith("met")) hist= new TH1D (histName.c_str(), "", 40, 0, 200e3);
   else if (var.BeginsWith("m")) hist= new TH1D (histName.c_str(), "", 100, 0, 1000);
   else if (var.Contains("pT")) hist= new TH1D (histName.c_str(), "", 60, 0, 600);
   else if (var.BeginsWith("d")) hist= new TH1D (histName.c_str(), "", 25, 0, 5);
@@ -353,10 +369,10 @@ void HHAnalysis::DrawDistriForLambdas(string extension){
     for (unsigned int iVar=0; iVar<m_vectVariables.size(); iVar++){
       vectExtremalBins.push_back(15e10); //arbitrary value
       vectExtremalBins.push_back(0);
-      plotName="tagcat"+to_string(m_vectCategories[iCat])+"-var"+m_vectVariables[iVar];
+      plotName="tagcat"+to_string(m_vectCategories[iCat])+"_var"+m_vectVariables[iVar];
       for(auto &it : m_mapHist){ //it.first =histName, it.second=hist
 	name=it.first;
-	if ( !name.BeginsWith((plotName+"-").c_str()) ) continue;
+	if ( !name.BeginsWith((plotName+"_").c_str()) ) continue;
 	if (m_vectSamples[0]!="ALL"){
 	  for (unsigned int iSample=0; iSample<m_vectSamples.size(); iSample++){
 	    if ( !name.EndsWith(m_vectSamples[iSample].c_str()) ) continue;
@@ -364,7 +380,7 @@ void HHAnalysis::DrawDistriForLambdas(string extension){
 	}// end if m_vectSamples[0]!="ALL"
 
 	name=it.second->GetName();
-	objArrayString = name.Tokenize("-");
+	objArrayString = name.Tokenize("_");
 	for(int iString=0; iString<objArrayString->GetEntriesFast(); iString++){
 	  tmp = ((TObjString*)objArrayString->At(iString))->GetString();
 	  if ( tmp.Contains("tagcat") ){ catName=tmp.ReplaceAll("tagcat","");}
@@ -441,9 +457,30 @@ void HHAnalysis::MakePdf( string latexFileName, vector<string> vectHistNames, st
   stream.close();
 
   cout<<"HHAnalysis::MakePdf "+latexFileName+"  Done"<<endl;
+  return;
 }
 
+//==================================================================================
+void HHAnalysis::SaveYields(){
+  TString histName, tmp;
 
+  for (unsigned int iCat=0; iCat<m_vectCategories.size(); iCat++){
+    ofstream outFile( (m_savePathPlot+"tagcat"+to_string(m_vectCategories[iCat])+"_yields.csv").c_str(), ios::out );
+    outFile<<"lambda"<<","<<"yield"<<"\n";
+    for (auto &it : m_mapHist){
+      histName=it.first;
+      if (!histName.Contains(("tagcat"+to_string(m_vectCategories[iCat])+"_varmbbgamgam_").c_str() ) ) continue;
+      TObjArray *objArrayString = histName.Tokenize("_");
+      for(int iString=0; iString<objArrayString->GetEntriesFast(); iString++){
+	tmp = ((TObjString*)objArrayString->At(iString))->GetString();
+	if ( tmp.Contains("sample") ) {tmp=tmp.ReplaceAll("samplehh",""); tmp=tmp.ReplaceAll("minus", "-"); tmp=tmp.ReplaceAll("plus", ""); }
+      }
+      outFile<<tmp<<","<<it.second->Integral(0, it.second->GetNbinsX()+1)<<endl;
+    }
+    outFile.close();
+  }
+  return;
+}
 
 
 //==================================================================================
