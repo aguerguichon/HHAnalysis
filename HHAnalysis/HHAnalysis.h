@@ -65,6 +65,7 @@ class HHAnalysis
   */
   bool IsEventSelected(int selectionType, ChrisLib::MapBranches mapBranches);
 
+  bool IsSampleSelected(std::string *sampleName);
   bool IsLowMass(ChrisLib::MapBranches mapBranches);
   bool IsHighMass(ChrisLib::MapBranches mapBranches);
 

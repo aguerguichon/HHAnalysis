@@ -220,12 +220,12 @@ void HHAnalysis::CreateSaveDistri(bool saveMassForWorkspace){
     inTree=(TTree*)inFile->Get("ntuple");
     if (!inFile) throw invalid_argument( "HHAnalysis::CreateSaveDistri: no tree provided." );
 
-    //    if (saveMassForWorkspace==1 && m_vectInFiles[iFile].find("Data")!=string::npos) {
     if (saveMassForWorkspace==1) {
       for (unsigned int iCat=0; iCat<m_vectCategories.size(); iCat++){
 	vectOfstream[iCat] = new ofstream( (m_savePathPlot+"tagcat"+to_string(m_vectCategories[iCat])+"_listOfEvents.csv").c_str(), ios::out);
       }
-      doSave=1;}
+      doSave=1;
+    }
 
     MapBranches MB; 
     MB.LinkTreeBranches(inTree, 0, listVariables);
@@ -234,17 +234,16 @@ void HHAnalysis::CreateSaveDistri(bool saveMassForWorkspace){
   
     for (unsigned int iEntry=0; iEntry<inTree->GetEntries(); iEntry++){
       inTree->GetEntry(iEntry);
-      if ( !IsEventSelected(m_selectionType, MB) ) continue;
+      if ( !IsEventSelected(m_selectionType, MB) || !IsSampleSelected(sampleName) ) continue;
       weight=GetWeight(m_selectionType%10, MB);
       if ( m_vectInFiles[iFile].find("LO")!=string::npos ) weight*=0.34*2.28;
 	
       //Create entries of m_mapHist and fill hists
       for (unsigned int iCat=0; iCat<m_vectCategories.size(); iCat++){
 	if ( MB.GetInt("tagcat")!=m_vectCategories[iCat] ) continue;
-	if (doSave) { 
-	  if (m_selectionType%10==2) *vectOfstream[iCat]<<MB.GetDouble("mgamgam")<<"\t"<<MB.GetDouble("mbbcorlow")<<"\t"<<MB.GetDouble("mbbgamgamcorlow")<<"\t"<<MB.GetDouble("mbbgamgamcorlowmodified")<<"\t"<<"1.0"<<"\n";
-	  if (m_selectionType%10==3) *vectOfstream[iCat]<<MB.GetDouble("mgamgam")<<"\t"<<MB.GetDouble("mbbcorhigh")<<"\t"<<MB.GetDouble("mbbgamgamcorhigh")<<"\t"<<MB.GetDouble("mbbgamgamcorhighmodified")<<"\t"<<"1.0"<<"\n";
-	}
+	if (doSave && m_selectionType%10==2) *vectOfstream[iCat]<<MB.GetDouble("mgamgam")<<"\t"<<MB.GetDouble("mbbcorlow")<<"\t"<<MB.GetDouble("mbbgamgamcorlow")<<"\t"<<MB.GetDouble("mbbgamgamcorlowmodified")<<"\t"<<"1.0"<<"\n";
+	if (doSave && m_selectionType%10==3) *vectOfstream[iCat]<<MB.GetDouble("mgamgam")<<"\t"<<MB.GetDouble("mbbcorhigh")<<"\t"<<MB.GetDouble("mbbgamgamcorhigh")<<"\t"<<MB.GetDouble("mbbgamgamcorhighmodified")<<"\t"<<"1.0"<<"\n";
+
 	for (unsigned int iVar=0; iVar<m_vectVariables.size(); iVar++ ){
 	  histName="tagcat"+to_string( MB.GetInt("tagcat") )+"_var"+m_vectVariables[iVar]+"_sample"+*sampleName;
 
@@ -273,6 +272,14 @@ void HHAnalysis::CreateSaveDistri(bool saveMassForWorkspace){
   cout<<"HHAnalysis::CreateSaveDistri done.\n";
 }
 
+//=================================================================================
+bool HHAnalysis::IsSampleSelected(string *sampleName){
+  for(unsigned int iSample=0; iSample<m_vectSamples.size(); iSample++){
+    if (m_vectSamples[iSample].compare("ALL")==0) return true; //take all samples
+    else if (m_vectSamples[iSample].compare(*sampleName)==0) return true;
+  }
+  return false;
+}
 
 //==================================================================================
 bool HHAnalysis::IsEventSelected(int selectionType, MapBranches MB){
@@ -378,13 +385,6 @@ void HHAnalysis::DrawDistriForLambdas(string extension){
       for(auto &it : m_mapHist){ //it.first =histName, it.second=hist
 	name=it.first;
 	if ( !name.BeginsWith((plotName+"_").c_str()) ) continue;
-	if (m_vectSamples[0]!="ALL"){
-	  for (unsigned int iSample=0; iSample<m_vectSamples.size(); iSample++){
-	    if ( !name.EndsWith(m_vectSamples[iSample].c_str()) ) continue;
-	  } //end iSample
-	}// end if m_vectSamples[0]!="ALL"
-
-	name=it.second->GetName();
 	objArrayString = name.Tokenize("_");
 	for(int iString=0; iString<objArrayString->GetEntriesFast(); iString++){
 	  tmp = ((TObjString*)objArrayString->At(iString))->GetString();
