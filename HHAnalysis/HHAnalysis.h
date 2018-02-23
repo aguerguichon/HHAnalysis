@@ -17,6 +17,18 @@
 class HHAnalysis
 {
  public:
+
+  /* Reads the configuration file. Different supported options are:
+    - inFile (vector<string>): root files to be used for the study.
+    - variable (vector<string>): variables used to create the histograms and to be drawn.
+    - sample (vector<string>): samples used. Keyword 'ALL' to used them all
+    - category (vector<int>)b-tag categories used.
+    - savePathPlot (string): path were the plots will be saved. Can be the absolute path or the absolute path+beginning of the name (name of the plot is automatically of the form tagcatX_varY).
+    - outFileName (string): name of the root file where histograms will be stored.
+    - selectionType (int): type of selection basic (selectionType%10) or extra (selectionType/10). More details in HHAnalysis::IsEventSelected.
+    - extraInfo (string): extra information to be written on plots (default value "").
+    - infoForWorkspace (int): information to be stored and used for workspace (default value 0). Possible values are 0 (none), 1 (mass), 2 (yields), 12 (yields +fit yields).
+   */
   HHAnalysis(std::string configFileName);
   ~HHAnalysis();
 
@@ -62,12 +74,12 @@ class HHAnalysis
 
   void MakePdf( std::string latexFileName, std::vector<std::string> vectHistNames, std::string comment );
 
-  void SaveYields();
+  void SaveYields(bool fitYield=0);
+  void FitYields(TH1D *histYield, std::string name);
   std::vector<double> ReturnExtremalBins(TH1* hist);
   
-  // void DrawCompLONLOForLambdas(TFile *LOFile, TTree *LOTree, TFile *NLOFile, TTree *NLOTree, std::list<std::string> vectVariables, std::string savePathPlot);
-
   std::string GetOutFileName();
+  int GetTypeInfoForWorkspace();
 
  private:
   std::map <std::string, TH1D*> m_mapHist;
@@ -82,4 +94,5 @@ class HHAnalysis
   std::string m_extraInfo;
 
   int m_selectionType;
+  int m_infoForWorkspace;
 };

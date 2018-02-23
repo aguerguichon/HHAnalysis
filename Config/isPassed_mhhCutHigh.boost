@@ -1,5 +1,10 @@
 inFile=/sps/atlas/d/delgove/private/HH/tree_v20/skim_file/LOSignal.root
-selectionType=32
+selectionType=31
+infoForWorkspace=12
+variable=mbb
+variable=dEtabb
+variable=dEtagamgam
+variable=dEtabbgamgam
 variable=mbbgamgam
 variable=pTb1
 variable=pTb2
@@ -11,25 +16,18 @@ variable=dRbb
 variable=dRgamgam
 variable=dRgamb
 variable=njets
-
-
-
-
-variable=mgamgam
-variable=mbb
-
-
+variable=dPhibb
 variable=dPhigamgam
 variable=metEt
 variable=methardvertex
 variable=mhhtruth
 variable=dPhibbgamgam
 variable=dRbbgamgam
-variable=dPhibb
+variable=mgamgam
 variable=mbbgamgammodified
 category=2
 category=1
 sample=ALL
-outFileName=/sps/atlas/a/aguerguichon/HHAnalysis/DistriLO/LowMass_mhhCutHigh.root
-savePathPlot=/sps/atlas/a/aguerguichon/HHAnalysis/DistriLO/LowMass_mhhCutHigh_
-extraInfo=Low mass selection, mhh > 350GeV
+outFileName=/sps/atlas/a/aguerguichon/HHAnalysis/DistriLO/isPassed_mhhCutHigh.root
+savePathPlot=/sps/atlas/a/aguerguichon/HHAnalysis/DistriLO/isPassed_mhhCutHigh_
+extraInfo=isPassed, mhh > 350GeV

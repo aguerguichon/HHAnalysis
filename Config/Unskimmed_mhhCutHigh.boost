@@ -1,5 +1,9 @@
 inFile=/sps/atlas/d/delgove/private/HH/tree_v20/LOSignal.root
-selectionType=0
+selectionType=30
+variable=mbb
+variable=dEtabb
+variable=dEtagamgam
+variable=dEtabbgamgam
 variable=mbbgamgam
 variable=pTb1
 variable=pTb2
@@ -11,25 +15,18 @@ variable=dRbb
 variable=dRgamgam
 variable=dRgamb
 variable=njets
-
-
-
-
-variable=mgamgam
-variable=mbb
-
-
+variable=dPhibb
 variable=dPhigamgam
 variable=metEt
 variable=methardvertex
 variable=mhhtruth
 variable=dPhibbgamgam
 variable=dRbbgamgam
-variable=dPhibb
+variable=mgamgam
 variable=mbbgamgammodified
 category=2
 category=1
 sample=ALL
-outFileName=/sps/atlas/a/aguerguichon/HHAnalysis/DistriLO/UnskimmedInclusif.root
-savePathPlot=/sps/atlas/a/aguerguichon/HHAnalysis/DistriLO/UnskimmedInclusif_
-extraInfo=Unskimmed, mhh inclusif
+outFileName=/sps/atlas/a/aguerguichon/HHAnalysis/DistriLO/Unskimmed_mhhCutHigh.root
+savePathPlot=/sps/atlas/a/aguerguichon/HHAnalysis/DistriLO/Unskimmed_mhhCutHigh_
+extraInfo=Unskimmed, mhh > 350GeV

@@ -45,11 +45,13 @@ int main(int argc, char *argv[])
   //=========================================================
 
   gErrorIgnoreLevel =kError; //removes warnings from root
+  int infoForWorkspace{0};
 
   for (unsigned int iFile=0; iFile <configFiles.size(); iFile++){
     HHAnalysis hh ( configFiles[iFile] );
-    hh.CreateSaveDistri(1);
-    hh.SaveYields();
+    infoForWorkspace = hh.GetTypeInfoForWorkspace();
+    hh.CreateSaveDistri(infoForWorkspace);
+    if (infoForWorkspace%10 == 2) hh.SaveYields(infoForWorkspace/10);
     hh.DrawDistriForLambdas("pdf");
   }
 

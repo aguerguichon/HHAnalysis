@@ -7,7 +7,8 @@
 #include <sstream>
 #include "boost/program_options.hpp"
 
-#include "TFile.h"                                                                          
+#include "TFile.h"                                                                      
+#include "TF1.h"
 #include "TTree.h"
 #include "TH1.h"
 #include "TH1D.h"
@@ -41,6 +42,7 @@ HHAnalysis::HHAnalysis(string configFileName){
     ("outFileName", po::value<string>(&m_outFileName), "Name of the root file where histograms will be stored.")
     ("selectionType", po::value<int>(&m_selectionType), "Type of selection basic (selectionType%10) or extra (selectionType/10)")
     ("extraInfo", po::value<string>(&m_extraInfo)->default_value(""), "Extra information to be written on plots.")
+    ("infoForWorkspace", po::value<int>(&m_infoForWorkspace)->default_value(0), "Information to be stored and used for workspace.")
     ;
   
   po::variables_map vm;
@@ -203,6 +205,7 @@ void HHAnalysis::CreateSaveDistri(bool saveMassForWorkspace){
   TFile *inFile{0};
   TTree *inTree{0};
   list<string> listVariables(m_vectVariables.begin(),m_vectVariables.end());
+
   bool doSave=0; vector <ofstream*> vectOfstream(m_vectCategories.size()); 
 
   listVariables.merge({"tagcat"});
@@ -217,9 +220,10 @@ void HHAnalysis::CreateSaveDistri(bool saveMassForWorkspace){
     inTree=(TTree*)inFile->Get("ntuple");
     if (!inFile) throw invalid_argument( "HHAnalysis::CreateSaveDistri: no tree provided." );
 
-    if (saveMassForWorkspace && m_vectInFiles[iFile].find("Data")!=string::npos) {
+    //    if (saveMassForWorkspace==1 && m_vectInFiles[iFile].find("Data")!=string::npos) {
+    if (saveMassForWorkspace==1) {
       for (unsigned int iCat=0; iCat<m_vectCategories.size(); iCat++){
-	vectOfstream[iCat] = new ofstream( (m_savePathPlot+"tagcat"+to_string(m_vectCategories[iCat])+"_selection"+to_string(m_selectionType)+".csv").c_str(), ios::out);
+	vectOfstream[iCat] = new ofstream( (m_savePathPlot+"tagcat"+to_string(m_vectCategories[iCat])+"_listOfEvents.csv").c_str(), ios::out);
       }
       doSave=1;}
 
@@ -238,8 +242,8 @@ void HHAnalysis::CreateSaveDistri(bool saveMassForWorkspace){
       for (unsigned int iCat=0; iCat<m_vectCategories.size(); iCat++){
 	if ( MB.GetInt("tagcat")!=m_vectCategories[iCat] ) continue;
 	if (doSave) { 
-	  if (m_selectionType%10==2) *vectOfstream[iCat]<<MB.GetDouble("mgamgam")<<","<<MB.GetDouble("mbbcorlow")<<","<<MB.GetDouble("mbbgamgamcorlow")<<","<<MB.GetDouble("mbbgamgamcorlowmodified")<<","<<"1.0"<<"\n";
-	  if (m_selectionType%10==3) *vectOfstream[iCat]<<MB.GetDouble("mgamgam")<<","<<MB.GetDouble("mbbcorhigh")<<","<<MB.GetDouble("mbbgamgamcorhigh")<<","<<MB.GetDouble("mbbgamgamcorhighmodified")<<","<<"1.0"<<"\n";
+	  if (m_selectionType%10==2) *vectOfstream[iCat]<<MB.GetDouble("mgamgam")<<"\t"<<MB.GetDouble("mbbcorlow")<<"\t"<<MB.GetDouble("mbbgamgamcorlow")<<"\t"<<MB.GetDouble("mbbgamgamcorlowmodified")<<"\t"<<"1.0"<<"\n";
+	  if (m_selectionType%10==3) *vectOfstream[iCat]<<MB.GetDouble("mgamgam")<<"\t"<<MB.GetDouble("mbbcorhigh")<<"\t"<<MB.GetDouble("mbbgamgamcorhigh")<<"\t"<<MB.GetDouble("mbbgamgamcorhighmodified")<<"\t"<<"1.0"<<"\n";
 	}
 	for (unsigned int iVar=0; iVar<m_vectVariables.size(); iVar++ ){
 	  histName="tagcat"+to_string( MB.GetInt("tagcat") )+"_var"+m_vectVariables[iVar]+"_sample"+*sampleName;
@@ -342,7 +346,8 @@ void HHAnalysis::InitialiseHist(TH1D* &hist, string histName, string strVariable
   if (var.Contains("mv2c")) hist= new TH1D (histName.c_str(), "", 200, -1, 1);
   else if (var.BeginsWith("mgamgam")) hist= new TH1D (histName.c_str(), "", 60, 110, 140);
   else if (var=="mbb") hist= new TH1D (histName.c_str(), "", 40, 0, 200);
-  else if (var.BeginsWith("met")) hist= new TH1D (histName.c_str(), "", 40, 0, 200e3);
+  else if (var.BeginsWith("mhhtruth")) hist= new TH1D (histName.c_str(), "", 48, 100e3, 1500e3);
+  else if (var.BeginsWith("met")) hist= new TH1D (histName.c_str(), "", 40, 0, 200);
   else if (var.BeginsWith("m")) hist= new TH1D (histName.c_str(), "", 100, 0, 1000);
   else if (var.Contains("pT")) hist= new TH1D (histName.c_str(), "", 60, 0, 600);
   else if (var.BeginsWith("d")) hist= new TH1D (histName.c_str(), "", 25, 0, 5);
@@ -400,14 +405,13 @@ void HHAnalysis::DrawDistriForLambdas(string extension){
       drawOpt.AddOption("outName", (m_savePathPlot+plotName).c_str() );
       drawOpt.AddOption("legendPos", "0.8 0.9");
       drawOpt.AddOption("latex", ("Category "+ catName +" b-tag").c_str() );
-      drawOpt.AddOption("latexOpt", "0.45 0.85");
-      if (m_extraInfo!="") {drawOpt.AddOption("latex", m_extraInfo.c_str()); drawOpt.AddOption("latexOpt", "0.45 0.8");}
+      drawOpt.AddOption("latexOpt", "0.45 0.9");
+      if (m_extraInfo!="") {drawOpt.AddOption("latex", m_extraInfo.c_str()); drawOpt.AddOption("latexOpt", "0.45 0.85");}
       drawOpt.AddOption("xTitle", varName);
       drawOpt.AddOption("normalize", "1");
       drawOpt.AddOption("extension", extension);
       drawOpt.Draw( vectHistTmp );
       
-      cout<<m_savePathPlot<<plotName<<"."<<extension<<" has been created.\n";
       vectHistNames.push_back(m_savePathPlot+plotName);
       vectOpt.clear();
       vectExtremalBins.clear();
@@ -443,9 +447,6 @@ void HHAnalysis::MakePdf( string latexFileName, vector<string> vectHistNames, st
 
     if (iVar == m_vectVariables.size()-1) stream<< var <<"\\newline  ";
     else  stream  << var <<", ";
-    // if (iVar == m_vectVariables.size()-1) stream<<m_vectVariables[iVar] <<"\\newline  ";
-    // else  stream  << m_vectVariables[iVar] <<", ";
-
   }
 
   WriteLatexMinipage( stream, vectHistNames, 2);
@@ -461,27 +462,79 @@ void HHAnalysis::MakePdf( string latexFileName, vector<string> vectHistNames, st
 }
 
 //==================================================================================
-void HHAnalysis::SaveYields(){
+void HHAnalysis::SaveYields(bool fitYield){
+  cout<<"HHAnalysis::SaveYields\n";
   TString histName, tmp;
+  TFile *outRootFile{0};
+  if (fitYield) outRootFile=new TFile((m_savePathPlot+"fit.root").c_str(), "RECREATE");  
+  TH1D *histYield{0};
+  double error{0};
 
   for (unsigned int iCat=0; iCat<m_vectCategories.size(); iCat++){
+    histYield=new TH1D(("yields_tagcat"+to_string(m_vectCategories[iCat])).c_str(), "", 24, -12.5, 11.5);
     ofstream outFile( (m_savePathPlot+"tagcat"+to_string(m_vectCategories[iCat])+"_yields.csv").c_str(), ios::out );
-    outFile<<"lambda"<<","<<"yield"<<"\n";
     for (auto &it : m_mapHist){
       histName=it.first;
       if (!histName.Contains(("tagcat"+to_string(m_vectCategories[iCat])+"_varmbbgamgam_").c_str() ) ) continue;
       TObjArray *objArrayString = histName.Tokenize("_");
       for(int iString=0; iString<objArrayString->GetEntriesFast(); iString++){
 	tmp = ((TObjString*)objArrayString->At(iString))->GetString();
-	if ( tmp.Contains("sample") ) {tmp=tmp.ReplaceAll("samplehh",""); tmp=tmp.ReplaceAll("minus", "-"); tmp=tmp.ReplaceAll("plus", ""); }
+	if ( tmp.Contains("sample") ) {tmp=tmp.ReplaceAll("sample",""); tmp=tmp.ReplaceAll("hh",""); tmp=tmp.ReplaceAll("minus", "-"); tmp=tmp.ReplaceAll("plus", ""); }
       }
-      outFile<<tmp<<","<<it.second->Integral(0, it.second->GetNbinsX()+1)<<endl;
+      outFile<<tmp<<"\t"<<it.second->Integral(0, it.second->GetNbinsX()+1)<<endl;
+      if (fitYield) {
+	histYield->SetBinContent( histYield->GetXaxis()->FindFixBin(tmp.Atof()), it.second->Integral(0, it.second->GetNbinsX()+1) );
+	it.second->IntegralAndError(0, it.second->GetNbinsX()+1, error);
+	histYield->SetBinError( histYield->GetXaxis()->FindFixBin(tmp.Atof()), error );
+      }
     }
     outFile.close();
+    if (fitYield) FitYields( histYield, to_string(m_vectCategories[iCat]));
   }
+
+  if (fitYield) outRootFile->Close();
+  delete outRootFile; outRootFile=0;
+  cout<<"HHAnalysis::SaveYields done.\n";
   return;
 }
-
+//=================================================================================
+void HHAnalysis::FitYields(TH1D* histYield, string name){
+  cout<<"HHAnalysis::FitYields\n";
+  ofstream outFile( m_savePathPlot+"tagcat"+name+"_lambdaParabola.csv", ios::out);
+  string latex;
+  TF1 *parabola=new TF1(("parabola"+name).c_str(), "[0]+[1]*x+[2]*x*x", -10, 10);
+  histYield->SetMarkerStyle(20);
+  histYield->SetMarkerColor(kBlack);
+  histYield->Fit( parabola, "R", "P");
+  histYield->Write();
+  DrawOptions drawOpt;
+  drawOpt.AddOption("outName", (m_savePathPlot+"tagcat"+name+"_yieldFit").c_str() );
+  drawOpt.AddOption("latex", ("Category "+ name +" b-tag").c_str() );
+  drawOpt.AddOption("latexOpt", "0.45 0.9");
+  if (m_extraInfo!="") {drawOpt.AddOption("latex", m_extraInfo.c_str()); drawOpt.AddOption("latexOpt", "0.45 0.85");}
+  drawOpt.AddOption("latex", "Fitting function p0+p1*x+p2*x*x") ;
+  drawOpt.AddOption("latexOpt", "0.6 0.8");
+  latex="p0: "+to_string(histYield->GetFunction(("parabola"+name).c_str())->GetParameter(0));
+  drawOpt.AddOption("latex", latex.c_str()) ;
+  drawOpt.AddOption("latexOpt", "0.6 0.77");
+  latex="p1: "+to_string(histYield->GetFunction(("parabola"+name).c_str())->GetParameter(1));
+  drawOpt.AddOption("latex", latex.c_str()) ;
+  drawOpt.AddOption("latexOpt", "0.6 0.74");
+  latex="p2: "+to_string(histYield->GetFunction(("parabola"+name).c_str())->GetParameter(2));
+  drawOpt.AddOption("latex", latex.c_str()) ;
+  drawOpt.AddOption("latexOpt", "0.6 0.71");
+  drawOpt.AddOption("xTitle", "__HASHTAGlambda");
+  drawOpt.AddOption("drawStyle", "3");
+  drawOpt.AddOption("yTitle", "Number of expected events");
+  drawOpt.AddOption("rangeUserY", "0 0.99");
+  drawOpt.Draw( {histYield} );
+  
+  outFile<<"Fittingfunction"<<"\t"<<"p0+p1*x+p2*x*x\n"<<"p0\t"<<histYield->GetFunction(("parabola"+name).c_str())->GetParameter(0)<<"\n"<<"p1\t"<<histYield->GetFunction(("parabola"+name).c_str())->GetParameter(1)<<"\n"<<"p2\t"<<histYield->GetFunction(("parabola"+name).c_str())->GetParameter(2)<<"\n";
+  outFile.close();
+  cout<<"Fit of yields saved in "<<m_savePathPlot<<"tagcat"<<name<<"_yieldFit.pdf and parameters in "<<m_savePathPlot<<"tagcat"<<name<<"_lambdaParabola.csv\n";
+  cout<<"HHAnalysis::FitYields done.\n";
+  return;
+}
 
 //==================================================================================
 vector<double> HHAnalysis::ReturnExtremalBins(TH1* hist){
@@ -507,5 +560,6 @@ string HHAnalysis::GetOutFileName(){
 }
 
 //==================================================================================
-/*void HHAnalysis::DrawCompLONLOForLambdas(TFile *LOFile, TTree *LOTree, TFile *NLOFile, TTree *NLOTree, list<string> vectVariables, string savePath){
-}*/
+int HHAnalysis::GetTypeInfoForWorkspace(){
+  return m_infoForWorkspace;
+}
